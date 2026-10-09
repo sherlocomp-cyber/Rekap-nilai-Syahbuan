@@ -1,0 +1,8 @@
+{
+  "appId": "id.sekolah.rekapnilai",
+  "appName": "Rekap Nilai",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

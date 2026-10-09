@@ -1,0 +1,25 @@
+// Dijalankan setelah "npx cap add android": pasang ikon + kunci tanda tangan tetap.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const res = path.join(root, 'android', 'app', 'src', 'main', 'res');
+if (!fs.existsSync(res)) { console.error('Folder android/ belum ada. Jalankan dulu: npx cap add android'); process.exit(1); }
+
+fs.rmSync(path.join(res, 'mipmap-anydpi-v26'), { recursive: true, force: true });
+const icon = path.join(root, 'resources', 'android', 'icon.png');
+for (const d of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+  const to = path.join(res, 'mipmap-' + d);
+  fs.mkdirSync(to, { recursive: true });
+  for (const f of ['ic_launcher.png', 'ic_launcher_round.png']) fs.copyFileSync(icon, path.join(to, f));
+}
+console.log('✔ ikon dipasang');
+
+const dest = path.join(os.homedir(), '.android', 'debug.keystore');
+if (process.argv.includes('--force') || process.env.CI || !fs.existsSync(dest)) {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(path.join(root, 'signing', 'debug.keystore'), dest);
+  console.log('✔ kunci tanda tangan dipasang');
+}
