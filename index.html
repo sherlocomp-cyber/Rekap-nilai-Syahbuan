@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <title>Aplikasi Rekap Nilai Sekolah</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+window.__rnVp=function(d,z){
+  var base=d?1024:(window.screen&&screen.width>0?screen.width:0);
+  if(!base) return null;
+  if(!d&&Math.abs(z-1)<0.001) return null;
+  return 'width='+Math.round(base/z)+', minimum-scale=0.1, maximum-scale=5, user-scalable=yes, viewport-fit=cover';
+};
+try{
+  var d=localStorage.getItem('rn_desktop')==='1', z=parseFloat(localStorage.getItem('rn_zoom'))||1;
+  var c=window.__rnVp(d,z);
+  if(c) document.querySelector('meta[name=viewport]').setAttribute('content',c);
+  if(d) document.documentElement.classList.add('desktop-mode');
+}catch(e){}
+</script>
 <meta name="theme-color" content="#3f6b52">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1356,6 +1370,43 @@ html.kb-open .undo-bar{display:none;}
 #navPickerOverlay .np-grid button{display:flex;align-items:center;gap:8px;min-height:46px;padding:8px 12px;border:1px solid var(--garis);border-radius:16px;background:var(--bg);color:var(--text);font:600 12px "Poppins",sans-serif;cursor:pointer;box-shadow:var(--shadow-raised-sm);text-align:left;}
 #navPickerOverlay .np-grid button.sel{color:var(--accent-text);box-shadow:var(--shadow-inset);}
 #navPickerOverlay .np-close{margin-top:12px;width:100%;min-height:44px;border:0;border-radius:16px;background:var(--bg);color:var(--text-muted);font:600 12px "Poppins",sans-serif;box-shadow:var(--shadow-raised-sm);cursor:pointer;}
+
+/* ===== MODE RINGKAS HP: area isi nilai lebih luas (semua halaman bertabel) ===== */
+@media (max-width:600px){
+  header{padding:6px 10px!important}
+  header p{display:none!important}
+  header .head-text{flex-direction:row!important;flex-wrap:wrap;align-items:center;gap:2px 10px!important}
+  .header-mark,.sidebar-logo{width:26px!important;height:26px!important;border-radius:9px!important;font-size:8px!important}
+  header h1{font-size:14px!important}
+  .header-status{margin-top:0!important;min-height:0!important;font-size:9.5px!important}
+  #themeToggle{width:34px!important;height:34px!important;font-size:15px!important}
+  main{padding:6px 3px calc(92px + env(safe-area-inset-bottom))!important}
+  section.page:not(#page-dashboard) .card{padding:8px 6px!important;border-radius:16px!important;margin-bottom:8px!important}
+  section.page:not(#page-dashboard) > .card:first-child{padding-top:8px!important}
+  .field label{font-size:11px}
+  .scroll-hint{margin:0 2px 4px!important;font-size:9.5px!important}
+  #hnRingkasanBox{font-size:11px;margin-bottom:4px!important}
+  .table-wrap{padding:0!important;border-radius:12px!important;max-height:calc(100dvh - 130px)!important}
+  .table-wrap table{min-width:0!important;width:max-content!important;font-size:11.5px!important}
+  .table-wrap table th,.table-wrap table td{padding:4px 3px!important}
+  .table-wrap table th:first-child,.table-wrap table td:first-child{width:28px!important;min-width:28px!important;max-width:28px!important;padding-left:2px!important;padding-right:2px!important}
+  .table-wrap table th:nth-child(2),.table-wrap table td:nth-child(2){left:28px!important;width:96px!important;min-width:96px!important;max-width:96px!important;white-space:normal!important;line-height:1.2;word-break:break-word}
+  .table-wrap table input[type=text],.table-wrap table input[type=number],.table-wrap table input[type=date],.table-wrap table select{min-width:54px!important;min-height:42px!important;padding:6px 4px!important;font-size:15px!important}
+  #fabBackup{bottom:calc(74px + env(safe-area-inset-bottom))!important}
+  #fabToggle{width:42px!important;height:42px!important;font-size:18px!important;opacity:.88}
+}
+
+.head-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+#desktopToggle{width:46px;height:46px;border-radius:50%;border:1px solid var(--garis);background:var(--bg);color:var(--accent-text);font-size:18px;box-shadow:var(--shadow-raised-sm);cursor:pointer}
+#desktopToggle:active{box-shadow:var(--shadow-inset);transform:scale(.96)}
+@media (max-width:600px){#desktopToggle{width:34px!important;height:34px!important;font-size:15px!important}}
+
+.zoom-ctl{display:flex;align-items:center;border:1px solid var(--garis);border-radius:999px;background:var(--bg);box-shadow:var(--shadow-raised-sm);overflow:hidden}
+.zoom-ctl button{border:0;background:transparent;color:var(--accent-text);font:800 16px/1 inherit;height:46px;min-width:40px;padding:0 6px;cursor:pointer}
+.zoom-ctl button#zoomVal{font-size:11px;min-width:46px;color:var(--text-muted,inherit)}
+.zoom-ctl button:active{box-shadow:var(--shadow-inset)}
+.zoom-ctl button:disabled{opacity:.35}
+@media (max-width:600px){.zoom-ctl button{height:34px!important;min-width:30px!important;font-size:15px!important}.zoom-ctl button#zoomVal{font-size:10px!important;min-width:38px!important}.head-actions{gap:5px!important}}
 </style>
 
 </head>
@@ -1368,9 +1419,45 @@ html.kb-open .undo-bar{display:none;}
       <p>Kelola nilai, rekap, dan perkembangan siswa dalam satu tempat.</p>
       <div class="header-status" id="headerSyncStatus" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span>Data tersimpan di perangkat</span></div>
     </div>
-    <button id="themeToggle" title="Ganti mode gelap/terang" aria-label="Ganti mode gelap atau terang">🌙</button>
+    <div class="head-actions"><div class="zoom-ctl" role="group" aria-label="Perbesar / perkecil tampilan"><button id="zoomOut" type="button" title="Perkecil tampilan" aria-label="Perkecil tampilan">−</button><button id="zoomVal" type="button" title="Klik untuk kembali ke 100%">100%</button><button id="zoomIn" type="button" title="Perbesar tampilan" aria-label="Perbesar tampilan">+</button></div><button id="desktopToggle" type="button" title="Tampilan desktop" aria-label="Ganti tampilan HP / desktop">🖥️</button><button id="themeToggle" title="Ganti mode gelap/terang" aria-label="Ganti mode gelap atau terang">🌙</button></div>
   </div>
 </header>
+<script>
+(function(){
+  var b=document.getElementById('desktopToggle'); if(!b) return;
+  var on=document.documentElement.classList.contains('desktop-mode');
+  b.textContent=on?'📱':'🖥️';
+  b.title=on?'Kembali ke tampilan HP':'Tampilan desktop';
+  b.addEventListener('click',function(){
+    try{ localStorage.setItem('rn_desktop', on?'0':'1'); }catch(e){}
+    setTimeout(function(){ location.reload(); },250); // muat ulang agar lebar layar baru diterapkan penuh
+  });
+})();
+</script>
+<script>
+(function(){
+  var steps=[0.6,0.7,0.8,0.9,1,1.1,1.2,1.35,1.5,1.75,2];
+  var out=document.getElementById('zoomOut'),inn=document.getElementById('zoomIn'),val=document.getElementById('zoomVal');
+  if(!out||!inn||!val) return;
+  var z=1,desk=false,timer=null;
+  try{ z=parseFloat(localStorage.getItem('rn_zoom'))||1; desk=localStorage.getItem('rn_desktop')==='1'; }catch(e){}
+  function near(v){var b=0;for(var i=1;i<steps.length;i++){if(Math.abs(steps[i]-v)<Math.abs(steps[b]-v))b=i;}return b;}
+  var i=near(z); z=steps[i];
+  function show(){ val.textContent=Math.round(z*100)+'%'; out.disabled=(i<=0); inn.disabled=(i>=steps.length-1); }
+  function apply(){
+    try{ localStorage.setItem('rn_zoom',String(z)); }catch(e){}
+    show();
+    var c=window.__rnVp&&window.__rnVp(desk,z);
+    var mv=document.querySelector('meta[name=viewport]');
+    if(mv) mv.setAttribute('content',c||'width=device-width, initial-scale=1, viewport-fit=cover');
+    clearTimeout(timer); timer=setTimeout(function(){ location.reload(); },700); // muat ulang agar layout baru pasti dipakai
+  }
+  out.addEventListener('click',function(){ if(i>0){ i--; z=steps[i]; apply(); } });
+  inn.addEventListener('click',function(){ if(i<steps.length-1){ i++; z=steps[i]; apply(); } });
+  val.addEventListener('click',function(){ i=near(1); z=1; apply(); });
+  show();
+})();
+</script>
 <div id="saveErrorBanner" style="display:none;background:#B3261E;color:#fff;padding:10px 14px;font-size:12.5px;position:sticky;top:56px;z-index:60;">
   ⚠️ Perubahan terakhir GAGAL disimpan di perangkat ini (penyimpanan browser penuh). Unduh cadangan sekarang, lalu hapus data lama di menu Pengaturan.
   <button class="btn secondary" style="background:#fff;color:var(--merah);margin-left:8px;padding:4px 10px;" data-act="unduh-darurat">⬇️ Unduh cadangan sekarang</button>

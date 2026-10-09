@@ -23,3 +23,25 @@ if (process.argv.includes('--force') || process.env.CI || !fs.existsSync(dest)) 
   fs.copyFileSync(path.join(root, 'signing', 'debug.keystore'), dest);
   console.log('✔ kunci tanda tangan dipasang');
 }
+
+// Aktifkan zoom cubit (pinch-zoom) di WebView Android
+const javaDir = path.join(root, 'android', 'app', 'src', 'main', 'java', 'id', 'sekolah', 'rekapnilai');
+fs.mkdirSync(javaDir, { recursive: true });
+fs.writeFileSync(path.join(javaDir, 'MainActivity.java'), `package id.sekolah.rekapnilai;
+
+import android.os.Bundle;
+import android.webkit.WebSettings;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+  @Override
+  public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    WebSettings st = this.bridge.getWebView().getSettings();
+    st.setSupportZoom(true);
+    st.setBuiltInZoomControls(true);
+    st.setDisplayZoomControls(false);
+  }
+}
+`);
+console.log('✔ zoom cubit diaktifkan');
