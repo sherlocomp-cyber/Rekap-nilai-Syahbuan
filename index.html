@@ -39,7 +39,17 @@
     return false;
   };
   window.__rnApply();
+  window.__rnFull=function(on){
+    try{
+      if(window.AndroidOrient&&window.AndroidOrient.fullscreen){window.AndroidOrient.fullscreen(!!on);return true;}
+      var e=document.documentElement;
+      if(on){var f=e.requestFullscreen||e.webkitRequestFullscreen;if(f){var r=f.call(e);if(r&&r.catch)r.catch(function(){});return true;}}
+      else if(document.fullscreenElement&&document.exitFullscreen){document.exitFullscreen();return true;}
+    }catch(x){}
+    return false;
+  };
   var c0=window.__rnCfg(); if(c0.o!=='auto') window.__rnOrient(c0.o);
+  if(g('rn_full','0')==='1') window.__rnFull(true);
   try{
     var mq=matchMedia('(orientation: landscape)'),h=function(){setTimeout(window.__rnApply,120);setTimeout(window.__rnApply,500);};
     if(mq.addEventListener) mq.addEventListener('change',h); else mq.addListener(h);
@@ -1484,6 +1494,8 @@ html.kb-open .undo-bar{display:none;}
   <div class="tp-zoom"><button type="button" id="tpOut" aria-label="Perkecil">−</button><button type="button" id="tpVal" title="Kembali ke 100%">100%</button><button type="button" id="tpIn" aria-label="Perbesar">+</button></div>
   <div class="tp-lbl">Orientasi layar</div>
   <div class="tp-seg" data-k="o"><button type="button" data-v="auto">Otomatis</button><button type="button" data-v="portrait">🔒 Potret</button><button type="button" data-v="landscape">🔒 Lanskap</button></div>
+  <div class="tp-lbl">Layar penuh</div>
+  <div class="tp-seg" data-k="full"><button type="button" data-v="0">Mati</button><button type="button" data-v="1">⛶ Aktif</button></div>
   <div class="tp-note" id="tpNote"></div>
   <button type="button" id="tpReset" class="tp-reset">Kembalikan standar</button>
 </div>
@@ -1497,11 +1509,11 @@ html.kb-open .undo-bar{display:none;}
   function nativeOK(){return !!((window.AndroidOrient&&window.AndroidOrient.set)||(screen.orientation&&screen.orientation.lock));}
   function ui(){
     var c=__rnCfg(),i=near(c.z);
-    panel.querySelectorAll('.tp-seg').forEach(function(sg){var k=sg.getAttribute('data-k'),cur=k==='mode'?c.mode:c.o;sg.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-v')===cur);});});
+    panel.querySelectorAll('.tp-seg').forEach(function(sg){var k=sg.getAttribute('data-k'),cur=k==='mode'?c.mode:(k==='full'?(localStorage.getItem('rn_full')==='1'?'1':'0'):c.o);sg.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-v')===cur);});});
     document.getElementById('tpVal').textContent=Math.round(steps[i]*100)+'%';
     document.getElementById('tpOut').disabled=i<=0; document.getElementById('tpIn').disabled=i>=steps.length-1;
     btn.textContent=c.mode==='desktop'?'🖥️':(c.o==='landscape'?'↔️':'📱');
-    document.getElementById('tpNote').textContent=(localStorage.getItem('rn_nometa')==='1'&&c.mode==='desktop')?'Mode Desktop butuh APK versi terbaru (build ulang di GitHub).':((c.o!=='auto'&&!nativeOK())?'Kunci orientasi hanya berfungsi di APK terbaru.':(c.mode==='desktop'?'Mode desktop paling nyaman dipakai dengan layar lanskap.':''));
+    document.getElementById('tpNote').textContent=(localStorage.getItem('rn_full')==='1'&&!(window.AndroidOrient&&window.AndroidOrient.fullscreen))?'Layar penuh hanya di APK versi terbaru.':(localStorage.getItem('rn_nometa')==='1'&&c.mode==='desktop')?'Mode Desktop butuh APK versi terbaru (build ulang di GitHub).':((c.o!=='auto'&&!nativeOK())?'Kunci orientasi hanya berfungsi di APK terbaru.':(c.mode==='desktop'?'Mode desktop paling nyaman dipakai dengan layar lanskap.':''));
   }
   function verify(){
     var s=__rnContent(__rnCfg()),m=/width=(\d+)/.exec(s),exp=m?+m[1]:__rnDevW();
@@ -1523,13 +1535,14 @@ html.kb-open .undo-bar{display:none;}
       var b=e.target.closest('button'); if(!b) return;
       var k=sg.getAttribute('data-k'),v=b.getAttribute('data-v');
       if(k==='mode'){ set('rn_mode',v); try{localStorage.removeItem('rn_desktop');}catch(x){} apply(); }
+      else if(k==='full'){ set('rn_full',v); __rnFull(v==='1'); apply(); }
       else { set('rn_orient',v); __rnOrient(v); apply(); }
     });
   });
   document.getElementById('tpOut').addEventListener('click',function(){var i=near(__rnCfg().z);if(i>0){set('rn_zoom',steps[i-1]);apply();}});
   document.getElementById('tpIn').addEventListener('click',function(){var i=near(__rnCfg().z);if(i<steps.length-1){set('rn_zoom',steps[i+1]);apply();}});
   document.getElementById('tpVal').addEventListener('click',function(){set('rn_zoom',1);apply();});
-  document.getElementById('tpReset').addEventListener('click',function(){set('rn_mode','auto');set('rn_zoom',1);set('rn_orient','auto');__rnOrient('auto');apply();});
+  document.getElementById('tpReset').addEventListener('click',function(){set('rn_mode','auto');set('rn_zoom',1);set('rn_orient','auto');__rnOrient('auto');set('rn_full','0');__rnFull(false);apply();});
   btn.addEventListener('click',function(e){e.stopPropagation();panel.hidden=!panel.hidden;if(!panel.hidden)ui();});
   document.addEventListener('click',function(e){if(!panel.hidden&&!panel.contains(e.target)&&e.target!==btn)panel.hidden=true;});
   document.addEventListener('keydown',function(e){if(e.key==='Escape')panel.hidden=true;});

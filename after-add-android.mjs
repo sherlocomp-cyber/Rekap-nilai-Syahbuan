@@ -31,6 +31,9 @@ fs.writeFileSync(path.join(javaDir, 'MainActivity.java'), `package id.sekolah.re
 
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import com.getcapacitor.BridgeActivity;
@@ -48,6 +51,12 @@ public class MainActivity extends BridgeActivity {
     // Jembatan JS -> kunci orientasi layar: window.AndroidOrient.set('landscape'|'portrait'|'auto')
     this.bridge.getWebView().addJavascriptInterface(new Object() {
       @JavascriptInterface
+      public void fullscreen(final boolean on) {
+        immersive = on;
+        setImmersive(on);
+      }
+
+      @JavascriptInterface
       public void set(final String mode) {
         MainActivity.this.runOnUiThread(new Runnable() {
           @Override
@@ -60,6 +69,30 @@ public class MainActivity extends BridgeActivity {
         });
       }
     }, "AndroidOrient");
+  }
+
+  private boolean immersive = false;
+
+  public void setImmersive(final boolean on) {
+    MainActivity.this.runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        WindowInsetsControllerCompat c = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (c == null) return;
+        if (on) {
+          c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+          c.hide(WindowInsetsCompat.Type.systemBars());
+        } else {
+          c.show(WindowInsetsCompat.Type.systemBars());
+        }
+      }
+    });
+  }
+
+  @Override
+  public void onWindowFocusChanged(boolean hasFocus) {
+    super.onWindowFocusChanged(hasFocus);
+    if (hasFocus && immersive) setImmersive(true);
   }
 }
 `);
