@@ -22,6 +22,11 @@
     var c=window.__rnCfg(),m=document.querySelector('meta[name=viewport]'),s=window.__rnContent(c);
     if(m&&m.getAttribute('content')!==s) m.setAttribute('content',s);
     document.documentElement.classList.toggle('desktop-mode',c.mode==='desktop');
+    window.__rnCss();
+  };
+  window.__rnCss=function(){
+    var c=window.__rnCfg(),on=g('rn_nometa','0')==='1'&&c.mode!=='desktop'&&Math.abs(c.z-1)>0.001;
+    document.documentElement.style.zoom=on?c.z:'';
   };
   window.__rnOrient=function(o){
     try{
@@ -1496,14 +1501,20 @@ html.kb-open .undo-bar{display:none;}
     document.getElementById('tpVal').textContent=Math.round(steps[i]*100)+'%';
     document.getElementById('tpOut').disabled=i<=0; document.getElementById('tpIn').disabled=i>=steps.length-1;
     btn.textContent=c.mode==='desktop'?'🖥️':(c.o==='landscape'?'↔️':'📱');
-    document.getElementById('tpNote').textContent=(c.o!=='auto'&&!nativeOK())?'Kunci orientasi hanya berfungsi di APK terbaru.':(c.mode==='desktop'?'Mode desktop paling nyaman dipakai dengan layar lanskap.':'');
+    document.getElementById('tpNote').textContent=(localStorage.getItem('rn_nometa')==='1'&&c.mode==='desktop')?'Mode Desktop butuh APK versi terbaru (build ulang di GitHub).':((c.o!=='auto'&&!nativeOK())?'Kunci orientasi hanya berfungsi di APK terbaru.':(c.mode==='desktop'?'Mode desktop paling nyaman dipakai dengan layar lanskap.':''));
   }
   function verify(){
     var s=__rnContent(__rnCfg()),m=/width=(\d+)/.exec(s),exp=m?+m[1]:__rnDevW();
     if(!exp) return;
-    if(Math.abs(document.documentElement.clientWidth-exp)>8){
-      try{ if(!sessionStorage.getItem('rn_rl')){ sessionStorage.setItem('rn_rl','1'); location.reload(); } }catch(e){}
-    } else { try{sessionStorage.removeItem('rn_rl');}catch(e){} }
+    var ok=Math.abs(document.documentElement.clientWidth-exp)<=8;
+    if(ok){
+      try{sessionStorage.removeItem('rn_rl');}catch(e){}
+      if(localStorage.getItem('rn_nometa')==='1'){set('rn_nometa','0');__rnCss();ui();}
+      return;
+    }
+    var tried=false; try{tried=!!sessionStorage.getItem('rn_rl');}catch(e){}
+    if(!tried){ try{sessionStorage.setItem('rn_rl','1');}catch(e){} location.reload(); return; }
+    set('rn_nometa','1'); __rnCss(); ui(); // WebView mengabaikan meta viewport -> pakai zoom CSS
   }
   var vt=null;
   function apply(){ __rnApply(); ui(); clearTimeout(vt); vt=setTimeout(verify,700); }

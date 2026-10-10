@@ -40,6 +40,8 @@ public class MainActivity extends BridgeActivity {
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     WebSettings st = this.bridge.getWebView().getSettings();
+    st.setUseWideViewPort(true);      // agar <meta viewport> (mode desktop & ukuran tampilan) dipakai
+    st.setLoadWithOverviewMode(true);
     st.setSupportZoom(true);
     st.setBuiltInZoomControls(true);
     st.setDisplayZoomControls(false);
