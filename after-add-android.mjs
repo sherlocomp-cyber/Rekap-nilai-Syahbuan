@@ -29,7 +29,9 @@ const javaDir = path.join(root, 'android', 'app', 'src', 'main', 'java', 'id', '
 fs.mkdirSync(javaDir, { recursive: true });
 fs.writeFileSync(path.join(javaDir, 'MainActivity.java'), `package id.sekolah.rekapnilai;
 
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import com.getcapacitor.BridgeActivity;
 
@@ -41,6 +43,21 @@ public class MainActivity extends BridgeActivity {
     st.setSupportZoom(true);
     st.setBuiltInZoomControls(true);
     st.setDisplayZoomControls(false);
+    // Jembatan JS -> kunci orientasi layar: window.AndroidOrient.set('landscape'|'portrait'|'auto')
+    this.bridge.getWebView().addJavascriptInterface(new Object() {
+      @JavascriptInterface
+      public void set(final String mode) {
+        MainActivity.this.runOnUiThread(new Runnable() {
+          @Override
+          public void run() {
+            int o = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+            if ("landscape".equals(mode)) o = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+            else if ("portrait".equals(mode)) o = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT;
+            MainActivity.this.setRequestedOrientation(o);
+          }
+        });
+      }
+    }, "AndroidOrient");
   }
 }
 `);

@@ -5,18 +5,41 @@
 <title>Aplikasi Rekap Nilai Sekolah</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>
-window.__rnVp=function(d,z){
-  var base=d?1024:(window.screen&&screen.width>0?screen.width:0);
-  if(!base) return null;
-  if(!d&&Math.abs(z-1)<0.001) return null;
-  return 'width='+Math.round(base/z)+', minimum-scale=0.1, maximum-scale=5, user-scalable=yes, viewport-fit=cover';
-};
-try{
-  var d=localStorage.getItem('rn_desktop')==='1', z=parseFloat(localStorage.getItem('rn_zoom'))||1;
-  var c=window.__rnVp(d,z);
-  if(c) document.querySelector('meta[name=viewport]').setAttribute('content',c);
-  if(d) document.documentElement.classList.add('desktop-mode');
-}catch(e){}
+(function(){
+  function g(k,d){try{var v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;}}
+  function mm(q){try{return matchMedia(q).matches;}catch(e){return false;}}
+  var DEF='width=device-width, initial-scale=1, viewport-fit=cover';
+  window.__rnDevW=function(){var a=screen.width||0,b=screen.height||0,s=Math.min(a,b),l=Math.max(a,b);if(!s)return 0;return mm('(orientation: landscape)')?l:s;};
+  window.__rnCfg=function(){var m=g('rn_mode',null);if(m==null)m=g('rn_desktop','0')==='1'?'desktop':'auto';return{mode:m,z:parseFloat(g('rn_zoom','1'))||1,o:g('rn_orient','auto')};};
+  window.__rnContent=function(c){
+    var dev=window.__rnDevW(), ext=', minimum-scale=0.1, maximum-scale=5, user-scalable=yes, viewport-fit=cover', w;
+    if(c.mode==='desktop') w=Math.round(Math.max(1000,dev)/c.z);
+    else if(!dev||Math.abs(c.z-1)<0.001) return mm('(orientation: landscape)')||c.mode==='hp'?'width=device-width, initial-scale=1'+ext:DEF;
+    else w=Math.round((c.mode==='hp'?Math.min(dev,899):dev)/c.z);
+    return 'width='+w+ext;
+  };
+  window.__rnApply=function(){
+    var c=window.__rnCfg(),m=document.querySelector('meta[name=viewport]'),s=window.__rnContent(c);
+    if(m&&m.getAttribute('content')!==s) m.setAttribute('content',s);
+    document.documentElement.classList.toggle('desktop-mode',c.mode==='desktop');
+  };
+  window.__rnOrient=function(o){
+    try{
+      if(window.AndroidOrient&&window.AndroidOrient.set){window.AndroidOrient.set(o);return true;}
+      if(screen.orientation&&screen.orientation.lock){
+        if(o==='auto'){if(screen.orientation.unlock)screen.orientation.unlock();return true;}
+        screen.orientation.lock(o).catch(function(){});return true;
+      }
+    }catch(e){}
+    return false;
+  };
+  window.__rnApply();
+  var c0=window.__rnCfg(); if(c0.o!=='auto') window.__rnOrient(c0.o);
+  try{
+    var mq=matchMedia('(orientation: landscape)'),h=function(){setTimeout(window.__rnApply,120);setTimeout(window.__rnApply,500);};
+    if(mq.addEventListener) mq.addEventListener('change',h); else mq.addListener(h);
+  }catch(e){}
+})();
 </script>
 <meta name="theme-color" content="#3f6b52">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1372,7 +1395,7 @@ html.kb-open .undo-bar{display:none;}
 #navPickerOverlay .np-close{margin-top:12px;width:100%;min-height:44px;border:0;border-radius:16px;background:var(--bg);color:var(--text-muted);font:600 12px "Poppins",sans-serif;box-shadow:var(--shadow-raised-sm);cursor:pointer;}
 
 /* ===== MODE RINGKAS HP: area isi nilai lebih luas (semua halaman bertabel) ===== */
-@media (max-width:600px){
+@media (max-width:600px), (max-height:520px) and (orientation:landscape) and (max-width:899px){
   header{padding:6px 10px!important}
   header p{display:none!important}
   header .head-text{flex-direction:row!important;flex-wrap:wrap;align-items:center;gap:2px 10px!important}
@@ -1407,6 +1430,32 @@ html.kb-open .undo-bar{display:none;}
 .zoom-ctl button:active{box-shadow:var(--shadow-inset)}
 .zoom-ctl button:disabled{opacity:.35}
 @media (max-width:600px){.zoom-ctl button{height:34px!important;min-width:30px!important;font-size:15px!important}.zoom-ctl button#zoomVal{font-size:10px!important;min-width:38px!important}.head-actions{gap:5px!important}}
+
+#tampilanBtn{width:46px;height:46px;border-radius:50%;border:1px solid var(--garis);background:var(--bg);color:var(--accent-text);font-size:18px;box-shadow:var(--shadow-raised-sm);cursor:pointer}
+#tampilanBtn:active{box-shadow:var(--shadow-inset);transform:scale(.96)}
+@media (max-width:600px){#tampilanBtn{width:34px!important;height:34px!important;font-size:15px!important}}
+#tampilanPanel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 58px);right:10px;width:min(300px,92vw);z-index:10000;background:var(--bg);border:1px solid var(--garis);border-radius:20px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+#tampilanPanel[hidden]{display:none}
+#tampilanPanel .tp-title{font-weight:800;font-size:15px;margin-bottom:6px}
+#tampilanPanel .tp-lbl{font-size:11px;font-weight:700;opacity:.7;margin:10px 0 5px}
+#tampilanPanel .tp-seg,#tampilanPanel .tp-zoom{display:flex;gap:6px}
+#tampilanPanel button{font:inherit;font-weight:700;font-size:12.5px;color:inherit;background:transparent;border:1px solid var(--garis);border-radius:12px;padding:9px 6px;min-height:40px;cursor:pointer}
+#tampilanPanel .tp-seg button{flex:1}
+#tampilanPanel .tp-zoom button{flex:1;font-size:16px}
+#tampilanPanel .tp-zoom button#tpVal{flex:1.4;font-size:12.5px}
+#tampilanPanel button.on{background:var(--accent,#f08a24);color:#fff;border-color:transparent}
+#tampilanPanel button:disabled{opacity:.35}
+#tampilanPanel .tp-note{font-size:11px;opacity:.8;margin-top:8px;min-height:0}
+#tampilanPanel .tp-reset{width:100%;margin-top:10px;font-size:12px}
+@media (max-height:520px) and (orientation:landscape) and (max-width:899px){
+  .mobile-bottom-nav{height:46px!important;left:6px!important;right:6px!important;bottom:calc(4px + env(safe-area-inset-bottom))!important}
+  .mobile-bottom-nav button{min-height:38px!important;font-size:10px!important;gap:0!important;padding:2px!important}
+  header{position:static!important}
+  main{padding-bottom:calc(58px + env(safe-area-inset-bottom))!important}
+  .table-wrap{max-height:calc(100dvh - 116px)!important}
+  #fabBackup{bottom:calc(56px + env(safe-area-inset-bottom))!important}
+  #tampilanPanel{top:8px}
+}
 </style>
 
 </head>
@@ -1419,45 +1468,64 @@ html.kb-open .undo-bar{display:none;}
       <p>Kelola nilai, rekap, dan perkembangan siswa dalam satu tempat.</p>
       <div class="header-status" id="headerSyncStatus" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span>Data tersimpan di perangkat</span></div>
     </div>
-    <div class="head-actions"><div class="zoom-ctl" role="group" aria-label="Perbesar / perkecil tampilan"><button id="zoomOut" type="button" title="Perkecil tampilan" aria-label="Perkecil tampilan">−</button><button id="zoomVal" type="button" title="Klik untuk kembali ke 100%">100%</button><button id="zoomIn" type="button" title="Perbesar tampilan" aria-label="Perbesar tampilan">+</button></div><button id="desktopToggle" type="button" title="Tampilan desktop" aria-label="Ganti tampilan HP / desktop">🖥️</button><button id="themeToggle" title="Ganti mode gelap/terang" aria-label="Ganti mode gelap atau terang">🌙</button></div>
+    <div class="head-actions"><button id="tampilanBtn" type="button" title="Tampilan: mode layar, ukuran, orientasi" aria-label="Pengaturan tampilan">🖥️</button><button id="themeToggle" title="Ganti mode gelap/terang" aria-label="Ganti mode gelap atau terang">🌙</button></div>
   </div>
 </header>
+<div id="tampilanPanel" hidden>
+  <div class="tp-title">Tampilan</div>
+  <div class="tp-lbl">Mode layar</div>
+  <div class="tp-seg" data-k="mode"><button type="button" data-v="auto">Otomatis</button><button type="button" data-v="hp">HP</button><button type="button" data-v="desktop">Desktop</button></div>
+  <div class="tp-lbl">Ukuran tampilan</div>
+  <div class="tp-zoom"><button type="button" id="tpOut" aria-label="Perkecil">−</button><button type="button" id="tpVal" title="Kembali ke 100%">100%</button><button type="button" id="tpIn" aria-label="Perbesar">+</button></div>
+  <div class="tp-lbl">Orientasi layar</div>
+  <div class="tp-seg" data-k="o"><button type="button" data-v="auto">Otomatis</button><button type="button" data-v="portrait">🔒 Potret</button><button type="button" data-v="landscape">🔒 Lanskap</button></div>
+  <div class="tp-note" id="tpNote"></div>
+  <button type="button" id="tpReset" class="tp-reset">Kembalikan standar</button>
+</div>
 <script>
 (function(){
-  var b=document.getElementById('desktopToggle'); if(!b) return;
-  var on=document.documentElement.classList.contains('desktop-mode');
-  b.textContent=on?'📱':'🖥️';
-  b.title=on?'Kembali ke tampilan HP':'Tampilan desktop';
-  b.addEventListener('click',function(){
-    try{ localStorage.setItem('rn_desktop', on?'0':'1'); }catch(e){}
-    setTimeout(function(){ location.reload(); },250); // muat ulang agar lebar layar baru diterapkan penuh
-  });
-})();
-</script>
-<script>
-(function(){
+  var panel=document.getElementById('tampilanPanel'),btn=document.getElementById('tampilanBtn');
+  if(!panel||!btn) return;
   var steps=[0.6,0.7,0.8,0.9,1,1.1,1.2,1.35,1.5,1.75,2];
-  var out=document.getElementById('zoomOut'),inn=document.getElementById('zoomIn'),val=document.getElementById('zoomVal');
-  if(!out||!inn||!val) return;
-  var z=1,desk=false,timer=null;
-  try{ z=parseFloat(localStorage.getItem('rn_zoom'))||1; desk=localStorage.getItem('rn_desktop')==='1'; }catch(e){}
+  function set(k,v){try{localStorage.setItem(k,String(v));}catch(e){}}
   function near(v){var b=0;for(var i=1;i<steps.length;i++){if(Math.abs(steps[i]-v)<Math.abs(steps[b]-v))b=i;}return b;}
-  var i=near(z); z=steps[i];
-  function show(){ val.textContent=Math.round(z*100)+'%'; out.disabled=(i<=0); inn.disabled=(i>=steps.length-1); }
-  function apply(){
-    try{ localStorage.setItem('rn_zoom',String(z)); }catch(e){}
-    show();
-    var c=window.__rnVp&&window.__rnVp(desk,z);
-    var mv=document.querySelector('meta[name=viewport]');
-    if(mv) mv.setAttribute('content',c||'width=device-width, initial-scale=1, viewport-fit=cover');
-    clearTimeout(timer); timer=setTimeout(function(){ location.reload(); },700); // muat ulang agar layout baru pasti dipakai
+  function nativeOK(){return !!((window.AndroidOrient&&window.AndroidOrient.set)||(screen.orientation&&screen.orientation.lock));}
+  function ui(){
+    var c=__rnCfg(),i=near(c.z);
+    panel.querySelectorAll('.tp-seg').forEach(function(sg){var k=sg.getAttribute('data-k'),cur=k==='mode'?c.mode:c.o;sg.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-v')===cur);});});
+    document.getElementById('tpVal').textContent=Math.round(steps[i]*100)+'%';
+    document.getElementById('tpOut').disabled=i<=0; document.getElementById('tpIn').disabled=i>=steps.length-1;
+    btn.textContent=c.mode==='desktop'?'🖥️':(c.o==='landscape'?'↔️':'📱');
+    document.getElementById('tpNote').textContent=(c.o!=='auto'&&!nativeOK())?'Kunci orientasi hanya berfungsi di APK terbaru.':(c.mode==='desktop'?'Mode desktop paling nyaman dipakai dengan layar lanskap.':'');
   }
-  out.addEventListener('click',function(){ if(i>0){ i--; z=steps[i]; apply(); } });
-  inn.addEventListener('click',function(){ if(i<steps.length-1){ i++; z=steps[i]; apply(); } });
-  val.addEventListener('click',function(){ i=near(1); z=1; apply(); });
-  show();
+  function verify(){
+    var s=__rnContent(__rnCfg()),m=/width=(\d+)/.exec(s),exp=m?+m[1]:__rnDevW();
+    if(!exp) return;
+    if(Math.abs(document.documentElement.clientWidth-exp)>8){
+      try{ if(!sessionStorage.getItem('rn_rl')){ sessionStorage.setItem('rn_rl','1'); location.reload(); } }catch(e){}
+    } else { try{sessionStorage.removeItem('rn_rl');}catch(e){} }
+  }
+  var vt=null;
+  function apply(){ __rnApply(); ui(); clearTimeout(vt); vt=setTimeout(verify,700); }
+  panel.querySelectorAll('.tp-seg').forEach(function(sg){
+    sg.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      var k=sg.getAttribute('data-k'),v=b.getAttribute('data-v');
+      if(k==='mode'){ set('rn_mode',v); try{localStorage.removeItem('rn_desktop');}catch(x){} apply(); }
+      else { set('rn_orient',v); __rnOrient(v); apply(); }
+    });
+  });
+  document.getElementById('tpOut').addEventListener('click',function(){var i=near(__rnCfg().z);if(i>0){set('rn_zoom',steps[i-1]);apply();}});
+  document.getElementById('tpIn').addEventListener('click',function(){var i=near(__rnCfg().z);if(i<steps.length-1){set('rn_zoom',steps[i+1]);apply();}});
+  document.getElementById('tpVal').addEventListener('click',function(){set('rn_zoom',1);apply();});
+  document.getElementById('tpReset').addEventListener('click',function(){set('rn_mode','auto');set('rn_zoom',1);set('rn_orient','auto');__rnOrient('auto');apply();});
+  btn.addEventListener('click',function(e){e.stopPropagation();panel.hidden=!panel.hidden;if(!panel.hidden)ui();});
+  document.addEventListener('click',function(e){if(!panel.hidden&&!panel.contains(e.target)&&e.target!==btn)panel.hidden=true;});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')panel.hidden=true;});
+  ui(); setTimeout(verify,900);
 })();
 </script>
+
 <div id="saveErrorBanner" style="display:none;background:#B3261E;color:#fff;padding:10px 14px;font-size:12.5px;position:sticky;top:56px;z-index:60;">
   ⚠️ Perubahan terakhir GAGAL disimpan di perangkat ini (penyimpanan browser penuh). Unduh cadangan sekarang, lalu hapus data lama di menu Pengaturan.
   <button class="btn secondary" style="background:#fff;color:var(--merah);margin-left:8px;padding:4px 10px;" data-act="unduh-darurat">⬇️ Unduh cadangan sekarang</button>
@@ -2218,10 +2286,14 @@ const PREDIKAT_LEVELS = ['A+','A','A-','B+','B','B-','C+','C','C-'];
 // "Sinkron otomatis" defaultnya NONAKTIF sampai URL diisi sendiri oleh pengguna.
 const DEFAULT_SYNC_URL = 'https://penilaian-9664c-default-rtdb.asia-southeast1.firebasedatabase.app';
 
-const NAMA_3A = ["Abdul Malik El Rasyid","Akbar Alfadhilah Putra S","Alfath Assyamil","Alfathunnisa","Alif Bahi Hakim","Aliyyah Hasanah Salsabila","Almer Abizar Misbah","Atthar Rahandika Alfariq","Ayu Sheha Nifa","Ayudia Inara Hideko","Clario kharisma Putra","Dinda Amelia Putri","Fadilah syamil al luqman","Ghaizka Nur Kanaya","Haikal Ammar syadin","Kimora Audreana Ramdhanni","Mikhayla Azzahra","Muhammad Azzam Nurwahid","Muhammad Jiddan Jaelani","Muhammad Salman Alfarisi","Nadhif Abqari Ammar","Putri Aulia Syalsabila","R. Assyifa Ramadhaniyyah","Shakila putri hendrawan","Shakilla Talbina Althaf","Syafiq Zhafran Luthfi","Tiara Aulia","Zakiyyah saqueena az zahra"];
-const NAMA_3B = ["Al Fathan Hafidz Permana","Arkaan Raynan Alfaris","Arzhanka","Ashilla Aisy Nahla","Asraf Hoirul Azam","Feby Viola Hoyono","Firyal Yasmine Azzahro","Ghina Novia Larasati","Hafsa Anindya Widyadhari","Haida zahratussalamah","Hana Farisa Almahira","Hasna Nuri Maulida","Hisyam Ghazaly Arrasyid","Kaniya Gendhis Razeeta","Khalif bilal Muhammad","Khayra Ardiana Wahid","Meghantara Diaz Ahmad","Muhammad Adzril rayyan shauqi","Muhammad Akbar maulana","Muhammad Azril Al Fariq","Muhammad Inggiel Erdogan","Muhammad Kairo Fitroh Fathansyah","Muhammad Zayn Nataprawira","Naya Hana Fadheela","Rafka Alghiffari","Raihanah Ibnaty Quinsaputra","Raisa","Sakhiya Mikhayla Mecca"];
-const NAMA_4A = ["ABIZAR REYNAND UTAMA","AKIRA TRISHA MAHESWARI","ALDEERA NUR RATIFA","ALFIN FAQIH","ANNASYA ADIFA RUMAIZA","ARSAKHA VIENDRA TSAQIB","ATTHAYA SYABIL PRATAMA","FAHMI AZHAR","HARUN ABDURRAHMAN","INSYIRA RAHIIL JILAN","MAHREZ MUHAMAD VICTORY REZKY","MAULA FATIH SUGIARTO","MUHAMMAD HABRI DHANURENDRA","MUTIARA ANUGERAH RINJANI","NAUFAL DIRGA ATALLAH","NIZAM ZIA ALBARRA","QAIREEN ALESHA PUTRI","RADIN AGATHA KIMORA VALLERY S","RAKHA RAFASYA AL-HAQ","REZA ABHISTA RAFIF","SHAKILA AULIA ZAHRANI SUTARDI","VALHAVI HARMIOR","YUSUF NURHAN MUNIR"];
-const NAMA_4B = ["ABDUL RASYID LIHIFZHIL","ABDULLOH HOERUL AZZAM","ABID FATHUL RAJENDRA","ADHARA WIRDA TSURAYYA","ADHWA HANIFA YASMIN","ANDIKA ADHA IBRAHIM","ANINDYA FAUZIAH ARIF","FATHIR MUHAMMAD AKBAR","IZAZ SYAKIB AL SHAFARAZ EDISON","MAHEER DZAKIR MUSYAFIQ","MUHAMAD ATHARIZZ SHAKEEL","MUHAMMAD AHSAN DHYRGA W.","NANDA FARIS RAMADHAN","NAURA ADEEVA MARTA","RAKHIS AIDANNAFI CHEVY MARDIANTO","RASYA RADIFA ALGHIFARI","RAUDHATUL BILQIS","SALSABILA PUTRI","SANJI MUBARAK ARIFIAN","SHAFANA ALMAHYRA GHANIA R.","SULTHAN RAFISQY AHNAF","TALITA KHUMAIRA"];
+// Daftar siswa resmi (sumber: file Kelas Online 3A/3B/4A/4B). Format [namaLama, namaBaru]:
+// namaLama dipakai SEMATA-MATA untuk menjaga id siswa & memindahkan nilai lama ke ejaan baru
+// (lihat migrasiDaftarNamaV2_). Urutan = urutan di file Excel.
+const PETA_NAMA_V2 = {"3A": [["Abdul Malik El Rasyid", "ABDUL MALIK EL RASYID"], ["Akbar Alfadhilah Putra S", "AKBAR AL FADHILAH PUTRA SUKIYADI"], ["Alfath Assyamil", "ALFATH ASYSYAMIL"], ["Alfathunnisa", "ALFATHUNISSA QURROTA A'YUN"], ["Alif Bahi Hakim", "ALIF BAHI HAKIM"], ["Aliyyah Hasanah Salsabila", "ALIYYAH HASANAH SALSABILA"], ["Almer Abizar Misbah", "ALMER ABIJAR MISBAH"], ["Atthar Rahandika Alfariq", "ATTHAR RAHANDIKA ALFARIQ"], ["Ayu Sheha Nifa", "AYU SHEHA NIFA"], ["Ayudia Inara Hideko", "AYUDIA INARA HIDEKO"], ["Clario kharisma Putra", "CLARIO KHARISMA PUTRA"], ["Dinda Amelia Putri", "DINDA AMELIA PUTRI"], ["Fadilah syamil al luqman", "FADILAH SYAMIL AL LUQMAN"], ["Ghaizka Nur Kanaya", "GHAIZKA NUR KANAYA"], ["Haikal Ammar syadin", "HAIKAL AMMAR SYADIN"], ["Kimora Audreana Ramdhanni", "KIMORA AUDREANA RAMDHANNI"], ["Mikhayla Azzahra", "MIKHAYLA AZZAHRA"], ["Muhammad Azzam Nurwahid", "MUHAMMAD AZZAM NURWAHID"], ["Muhammad Jiddan Jaelani", "MUHAMMAD JIDDAN JAELANI"], ["Muhammad Salman Alfarisi", "MUHAMMAD SALMAN AL-FARIZI"], ["Nadhif Abqari Ammar", "NADHIF ABQARI AMMAR"], ["Putri Aulia Syalsabila", "PUTRI AULIA SYALSABILA"], ["R. Assyifa Ramadhaniyyah", "R. ASSYIFA RAMADHANIYYAH"], ["Shakila putri hendrawan", "SHAKILA PUTRI HENDRAWAN"], ["Shakilla Talbina Althaf", "SHAKILLA TABINA ALTHAF"], ["Syafiq Zhafran Luthfi", "SYAFIQ ZHAFRAN LUTHFI"], ["Tiara Aulia", "TIARA AULIA"], ["Zakiyyah saqueena az zahra", "ZAKIYYAH SAQUEENA AZ ZAHRA"]], "3B": [["Al Fathan Hafidz Permana", "ALFATHAN HAFIZ PERMANA"], ["Arkaan Raynan Alfaris", "ARKAAN RAYNAN ALFARIS"], ["Arzhanka", "ARZHANKA EL ZHAFRAN"], ["Ashilla Aisy Nahla", "ASHILLA AISY NAHLA"], ["Asraf Hoirul Azam", "ASRAF HOIRUL AZAM"], ["Feby Viola Hoyono", "FEBY VIOLA HOYONO"], ["Firyal Yasmine Azzahro", "FIRYAL YASMINE AZZAHRO"], ["Ghina Novia Larasati", "GHINA NOVIA LARASATI"], ["Hafsa Anindya Widyadhari", "HAFSA ANINDYA WIDYADHARI"], ["Haida zahratussalamah", "HAIDA ZAHRATUSSALAMAH"], ["Hana Farisa Almahira", "HANA FARISA ALMAHIRA"], ["Hasna Nuri Maulida", "HASNA NURI MAULIDA"], ["Hisyam Ghazaly Arrasyid", "HISYAM GHAZALY ARRASYID"], ["Kaniya Gendhis Razeeta", "KANIYA GENDHIS RAZEETA"], ["Khalif bilal Muhammad", "KHALIF BILAL MUHAMMAD"], ["Khayra Ardiana Wahid", "KHAYRA ARDIANA WAHID"], ["Muhammad Adzril rayyan shauqi", "M. ADZRIL RAYYAN SHAUQI"], ["Meghantara Diaz Ahmad", "MEGHANTARA DIAZ AHMAD"], ["Muhammad Akbar maulana", "MUHAMMAD AKBAR MAULANA"], ["Muhammad Azril Al Fariq", "MUHAMMAD AZRIL ALFARIQ"], ["Muhammad Inggiel Erdogan", "MUHAMMAD INGGIEL ERDOGAN"], ["Muhammad Kairo Fitroh Fathansyah", "MUHAMMAD KAIRO FITROH FATHANSYAH"], ["Muhammad Zayn Nataprawira", "MUHAMMAD ZAYN NATAPRAWIRA"], ["Naya Hana Fadheela", "NAYA HANA FADHEELA"], ["Rafka Alghiffari", "RAFKA ALGHIFFARI"], ["Raihanah Ibnaty Quinsaputra", "RAIHANAH IBNATY QUINSAPUTRA"], ["Raisa", "RAISA NURUL HASANAH"], ["Sakhiya Mikhayla Mecca", "SAKHIYA MIKHAYLA MECCA"]], "4A": [["ABIZAR REYNAND UTAMA", "ABIZAR REYNAND UTAMA"], ["AKIRA TRISHA MAHESWARI", "AKIRA TRISHA MAHESWARI"], ["ALDEERA NUR RATIFA", "ALDEERA NUR RATIFA"], ["ALFIN FAQIH", "ALVIN FAQIH HUSEINI"], ["ANNASYA ADIFA RUMAIZA", "ANNASYA ADIFA RUMAIZA"], ["ARSAKHA VIENDRA TSAQIB", "ARSAKHA VIENDRA TSAQIB"], ["ATTHAYA SYABIL PRATAMA", "ATHAYA SYABIL PRATAMA"], ["FAHMI AZHAR", "FAHMI AZHAR"], ["HARUN ABDURRAHMAN", "HARUN ABDURRAHMAN"], ["INSYIRA RAHIIL JILAN", "INSYIRA RAHIIL JILAN"], ["MAULA FATIH SUGIARTO", "MAULA FATIH SUGIARTO"], ["MUHAMMAD HABRI DHANURENDRA", "MUHAMMAD HABRI DHANURENDRA"], ["MUTIARA ANUGERAH RINJANI", "MUTIARA ANUGERAH RINJANI"], ["MAHREZ MUHAMAD VICTORY REZKY", "Mahrez Muhamad Victory Rezky"], ["NIZAM ZIA ALBARRA", "NIZAM ZIA ALBARRA"], ["NAUFAL DIRGA ATALLAH", "Naufal Dirga Atallah"], ["QAIREEN ALESHA PUTRI", "QAIREEN ALESHA PUTRI"], ["RADIN AGATHA KIMORA VALLERY S", "RADIN AGATHA KIMORA VALLERY S"], ["RAKHA RAFASYA AL-HAQ", "RAKHA RAFASYA AL-HAQ"], ["REZA ABHISTA RAFIF", "REZA ABHISTA RAFIF"], ["SHAKILA AULIA ZAHRANI SUTARDI", "SHAKILA AULIA ZAHRANI SUTARDI"], ["VALHAVI HARMIOR", "VALHAVI HARMIOR"], ["YUSUF NURHAN MUNIR", "YUSUF NURHAN MUNIR"]], "4B": [["ABDUL RASYID LIHIFZHIL", "ABDUL RASYID LIHIFZHIL"], ["ABDULLOH HOERUL AZZAM", "ABDULLOH HOERUL AZZAM"], ["ABID FATHUL RAJENDRA", "ABID FATHUL RAJENDRA"], ["ADHARA WIRDA TSURAYYA", "ADHARA WIRDA TSURAIYYA"], ["ADHWA HANIFA YASMIN", "ADHWA HANIFA YASMIN"], ["ANDIKA ADHA IBRAHIM", "ANDIKA ADHA IBRAHIM"], ["ANINDYA FAUZIAH ARIF", "ANINDYA FAUZIAH ARIF"], ["FATHIR MUHAMMAD AKBAR", "FATHIR MUHAMMAD AKBAR"], ["IZAZ SYAKIB AL SHAFARAZ EDISON", "IZAZ SYAKIB AL SHAFARAZ EDISON"], ["MAHEER DZAKIR MUSYAFIQ", "MAHEER DZAKIR MUSYAFIQ"], ["MUHAMAD ATHARIZZ SHAKEEL", "MUHAMAD ATHARIZZ SHAKEEL CAHYA AL-CALIEF"], ["MUHAMMAD AHSAN DHYRGA W.", "MUHAMMAD AHSAN DHYRGA WIRAWAN"], ["NANDA FARIS RAMADHAN", "NANDA FARIS RAMADHAN"], ["NAURA ADEEVA MARTA", "NAURA ADEEVA MARTA"], ["RAKHIS AIDANNAFI CHEVY MARDIANTO", "RAKHIS AIDANNAFI CHEVY MARDIANTO"], ["RASYA RADIFA ALGHIFARI", "RASYA RADIFA ALGHIFARI"], ["RAUDHATUL BILQIS", "RAUDHATUL BILQIS"], ["SALSABILA PUTRI", "SALSABILA PUTRI"], ["SANJI MUBARAK ARIFIAN", "SANJI MUBARAK ARIFIAN"], ["SHAFANA ALMAHYRA GHANIA R.", "SHAFANA ALMAHYRA GHANIA RAHMA"], ["SULTHAN RAFISQY AHNAF", "SULTHAN RAFISQY AHNAF"], ["TALITA KHUMAIRA", "TALITA KHUMAIRA"]]};
+const NAMA_3A = PETA_NAMA_V2['3A'].map(p=>p[1]);
+const NAMA_3B = PETA_NAMA_V2['3B'].map(p=>p[1]);
+const NAMA_4A = PETA_NAMA_V2['4A'].map(p=>p[1]);
+const NAMA_4B = PETA_NAMA_V2['4B'].map(p=>p[1]);
 
 function defaultDB(){
   return {
@@ -2236,10 +2308,10 @@ function defaultDB(){
     // beranak/duplikat" yang sebelumnya hanya ditambal lewat pencocokan
     // nama (lihat bersihkanNamaSiswa_, perbaikiDuplikatSiswaAkibatMerge).
     kelasList: [
-      {id:"3A", nama:"3A", kelompok:"3", siswa: NAMA_3A.map(nama=>({id:hashIdTetap_('3A|'+nama.toLowerCase()), nama}))},
-      {id:"3B", nama:"3B", kelompok:"3", siswa: NAMA_3B.map(nama=>({id:hashIdTetap_('3B|'+nama.toLowerCase()), nama}))},
-      {id:"4A", nama:"4A", kelompok:"4", siswa: NAMA_4A.map(nama=>({id:hashIdTetap_('4A|'+nama.toLowerCase()), nama}))},
-      {id:"4B", nama:"4B", kelompok:"4", siswa: NAMA_4B.map(nama=>({id:hashIdTetap_('4B|'+nama.toLowerCase()), nama}))}
+      {id:"3A", nama:"3A", kelompok:"3", siswa: PETA_NAMA_V2['3A'].map(p=>({id:hashIdTetap_('3A|'+p[0].toLowerCase()), nama:bersihkanNamaSiswa_(p[1])}))},
+      {id:"3B", nama:"3B", kelompok:"3", siswa: PETA_NAMA_V2['3B'].map(p=>({id:hashIdTetap_('3B|'+p[0].toLowerCase()), nama:bersihkanNamaSiswa_(p[1])}))},
+      {id:"4A", nama:"4A", kelompok:"4", siswa: PETA_NAMA_V2['4A'].map(p=>({id:hashIdTetap_('4A|'+p[0].toLowerCase()), nama:bersihkanNamaSiswa_(p[1])}))},
+      {id:"4B", nama:"4B", kelompok:"4", siswa: PETA_NAMA_V2['4B'].map(p=>({id:hashIdTetap_('4B|'+p[0].toLowerCase()), nama:bersihkanNamaSiswa_(p[1])}))}
     ],
     raporKonfigJson: '', // pengaturan Rapor Ringkas kustom (JSON string, disimpan utuh)
     materiTPJson: '',    // daftar materi per TP untuk isi template Excel (JSON string: "mapel||kelompok" -> [materi TP1, TP2, ...])
@@ -2339,7 +2411,7 @@ function loadDB(){
   try{
     const raw = bacaDariLocalStorage_(STORAGE_KEY);
     rawMentah_ = raw;
-    if(!raw){ const d = defaultDB(); migrateKelasKelompok(d); migrateKunciJawabanKelompok(d); migrasiNamaSiswaTidakValid(d); perbaikiDuplikatSiswaAkibatMerge(d); bersihkanDuplikatDiDataUts_(d); migrasiSiswaKeId_(d); return d; }
+    if(!raw){ const d = defaultDB(); migrateKelasKelompok(d); migrateKunciJawabanKelompok(d); migrasiNamaSiswaTidakValid(d); perbaikiDuplikatSiswaAkibatMerge(d); bersihkanDuplikatDiDataUts_(d); migrasiSiswaKeId_(d); migrasiDaftarNamaV2_(d); return d; }
     const parsed = JSON.parse(raw);
     const def = defaultDB();
     const merged = Object.assign(def, parsed);
@@ -2348,7 +2420,7 @@ function loadDB(){
     migrasiNamaSiswaTidakValid(merged);
     perbaikiDuplikatSiswaAkibatMerge(merged);
     bersihkanDuplikatDiDataUts_(merged);
-    migrasiSiswaKeId_(merged);
+    migrasiSiswaKeId_(merged); migrasiDaftarNamaV2_(merged);
     return merged;
   }catch(e){
     logWarn_('Gagal memuat data, memakai data awal.', e);
@@ -2370,7 +2442,7 @@ function loadDB(){
     migrasiNamaSiswaTidakValid(d);
     perbaikiDuplikatSiswaAkibatMerge(d);
     bersihkanDuplikatDiDataUts_(d);
-    migrasiSiswaKeId_(d);
+    migrasiSiswaKeId_(d); migrasiDaftarNamaV2_(d);
     return d;
   }
 }
@@ -2803,7 +2875,7 @@ function gabungkanRemoteKeDB_(remote){
   migrasiNamaSiswaTidakValid(remote);
   perbaikiDuplikatSiswaAkibatMerge(remote);
   bersihkanDuplikatDiDataUts_(remote);
-  migrasiSiswaKeId_(remote);
+  migrasiSiswaKeId_(remote); migrasiDaftarNamaV2_(remote);
   // Tombstone tugas digabung: nilai dengan waktu |abs| lebih baru menang (positif=hapus, negatif=undo).
   const thGabung = gabungTombstone_(DB.tugasTombstone, remote.tugasTombstone);
   if(remote.tugas && Array.isArray(remote.tugas)){
@@ -2969,7 +3041,7 @@ async function tarikDariFirebase_(manual){
         migrasiNamaSiswaTidakValid(DB);
         perbaikiDuplikatSiswaAkibatMerge(DB);
         bersihkanDuplikatDiDataUts_(DB);
-        migrasiSiswaKeId_(DB);
+        migrasiSiswaKeId_(DB); migrasiDaftarNamaV2_(DB);
         saveDB(false, false); // simpan apa adanya, pertahankan jam ubah asli dari remote
         }
         refreshAllDropdowns();
@@ -3433,6 +3505,48 @@ function migrasiSiswaKeId_(db){
     });
   });
   if(changed) logInfo_('Migrasi id siswa selesai: setiap siswa kini punya id permanen selain nama.');
+}
+// Menyelaraskan daftar siswa dengan daftar resmi (PETA_NAMA_V2) pada data yang SUDAH tersimpan:
+// ganti ejaan nama (id siswa tetap), pindahkan nilai harian & data UTS ke nama baru, tambah siswa
+// yang belum ada, dan urutkan sesuai file Excel. Aman dijalankan berulang (idempoten).
+function migrasiDaftarNamaV2_(db){
+  try{
+    if(!db || !Array.isArray(db.kelasList)) return;
+    const peta = {}, susunan = {}, idLama = {};
+    Object.keys(PETA_NAMA_V2).forEach(kid=>{
+      susunan[kid] = [];
+      PETA_NAMA_V2[kid].forEach(p=>{
+        const baru = bersihkanNamaSiswa_(p[1]);
+        peta[bersihkanNamaSiswa_(p[0]).toLowerCase()] = baru;
+        peta[baru.toLowerCase()] = baru;
+        susunan[kid].push(baru);
+        idLama[kid+'|'+baru.toLowerCase()] = hashIdTetap_(kid+'|'+p[0].toLowerCase());
+      });
+    });
+    const ganti = n => { if(typeof n !== 'string') return n; return peta[bersihkanNamaSiswa_(n).toLowerCase()] || n; };
+    db.kelasList.forEach(k=>{
+      if(!susunan[k.id] || !Array.isArray(k.siswa)) return;
+      k.siswa.forEach(s=>{ if(s && typeof s === 'object') s.nama = ganti(s.nama); });
+      const ada = new Set(k.siswa.map(s=>s && String(s.nama||'').toLowerCase()));
+      susunan[k.id].forEach(n=>{ if(!ada.has(n.toLowerCase())) k.siswa.push({id: idLama[k.id+'|'+n.toLowerCase()], nama: n}); });
+      const urut = susunan[k.id].map(n=>n.toLowerCase());
+      k.siswa = k.siswa.map((s,i)=>({s, i, p: urut.indexOf(String(s.nama||'').toLowerCase())}))
+        .sort((x,y)=>((x.p<0?1e6+x.i:x.p)-(y.p<0?1e6+y.i:y.p))).map(o=>o.s);
+    });
+    if(db.nilaiHarian && typeof db.nilaiHarian === 'object'){
+      Object.keys(db.nilaiHarian).forEach(tid=>{
+        const o = db.nilaiHarian[tid]; if(!o || typeof o !== 'object') return;
+        Object.keys(o).forEach(key=>{
+          const nk = ganti(key); if(nk === key) return;
+          if(!(nk in o) || o[nk] === '' || o[nk] == null) o[nk] = o[key];
+          delete o[key];
+        });
+      });
+    }
+    semuaEntriUts_(db).forEach(({entri})=>{
+      if(entri && Array.isArray(entri.siswa)) entri.siswa.forEach(s=>{ if(s && s.nama) s.nama = ganti(s.nama); });
+    });
+  }catch(e){ logWarn_('Gagal menyelaraskan daftar nama siswa.', e); }
 }
 function keyOf(mapel, kelas){ return mapel + '||' + kelas; }
 function getKelasObj(kelasId){ return DB.kelasList.find(k => k.id === kelasId); }
@@ -4413,7 +4527,7 @@ async function pulihkanSnapshotDarurat(idx){
   migrasiNamaSiswaTidakValid(DB);
   perbaikiDuplikatSiswaAkibatMerge(DB);
   bersihkanDuplikatDiDataUts_(DB);
-  migrasiSiswaKeId_(DB);
+  migrasiSiswaKeId_(DB); migrasiDaftarNamaV2_(DB);
   saveDB(); refreshAllDropdowns(); gotoPage('pengaturan');
   showToast('Data dipulihkan dari snapshot darurat.');
 }
@@ -4438,7 +4552,7 @@ document.getElementById('inputImportBackup').addEventListener('change', (e)=>{
       migrasiNamaSiswaTidakValid(DB);
       perbaikiDuplikatSiswaAkibatMerge(DB);
       bersihkanDuplikatDiDataUts_(DB);
-      migrasiSiswaKeId_(DB);
+      migrasiSiswaKeId_(DB); migrasiDaftarNamaV2_(DB);
       saveDB(); refreshAllDropdowns(); gotoPage('pengaturan');
       showToast('Data berhasil diimpor.');
     }catch(err){ alertDialog('File cadangan tidak valid.'); }
