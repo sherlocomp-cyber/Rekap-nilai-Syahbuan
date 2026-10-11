@@ -11,28 +11,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Susun folder
-        run: |
-          mkdir -p src scripts signing resources/android
-          mv index.html src/index.html
-          mv prepare.mjs android-shim.js after-add-android.mjs scripts/
-          mv debug.keystore signing/debug.keystore
-          mv icon.png resources/android/icon.png
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - run: npm install
-      - run: node scripts/prepare.mjs
-      - run: npx cap add android
-      - run: node scripts/after-add-android.mjs
-      - run: npx cap sync android
+      - name: Pasang dependensi
+        run: npm install
+
+      - name: Siapkan web (unduh library & font untuk mode offline)
+        run: node scripts/prepare.mjs
+
+      - name: Buat proyek Android
+        run: |
+          npx cap add android
+          node scripts/after-add-android.mjs
+          npx cap sync android
 
       - name: Build APK
         working-directory: android
