@@ -24,7 +24,13 @@ Aplikasi rekap nilai sekolah (satu berkas HTML) yang dibungkus menjadi aplikasi 
 
 Folder `www/` dan `android/` dibuat saat build dan tidak disimpan di repo (lihat `.gitignore`).
 
-## Cara mendapatkan APK
+## Unduh APK (rilis)
+
+Versi stabil ada di tab **Releases** di sisi kanan halaman repo. Unduh berkas `Rekap-Nilai-vX.Y.Z.apk` dan pasang di HP Android.
+
+Menerbitkan rilis baru: buat tag versi lalu *push*, misalnya `git tag v1.2.0 && git push origin v1.2.0`. Workflow akan membangun APK dan membuat rilisnya otomatis (catatan rilis diambil dari `RELEASE_NOTES.md`).
+
+## Cara mendapatkan APK dari Actions
 
 1. Buka tab **Actions** → workflow **Build APK**.
 2. Klik **Run workflow** (atau cukup *push* ke branch `main`).

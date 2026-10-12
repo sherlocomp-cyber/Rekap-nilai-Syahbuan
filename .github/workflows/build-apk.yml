@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    tags: ['v*']
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -40,3 +44,13 @@ jobs:
         with:
           name: rekap-nilai-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Terbitkan rilis (hanya saat ada tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk "Rekap-Nilai-${GITHUB_REF_NAME}.apk"
+          gh release create "$GITHUB_REF_NAME" "Rekap-Nilai-${GITHUB_REF_NAME}.apk" \
+            --title "Rekap Nilai ${GITHUB_REF_NAME}" \
+            --notes-file RELEASE_NOTES.md
