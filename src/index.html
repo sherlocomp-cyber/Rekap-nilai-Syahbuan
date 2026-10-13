@@ -728,6 +728,21 @@ details.settings-block[open] summary{margin-bottom:10px;}
 .hnq-grp{display:flex;flex-direction:column;min-width:0}
 .hnq-grp small{color:var(--abu);font-weight:500;font-size:12px;line-height:1.3}
 .hnq-sec{margin:12px 0 4px;font-size:12px;font-weight:700;color:var(--abu);text-transform:uppercase;letter-spacing:.04em}
+
+/* ===== Status siswa, nilai individu, ringkasan, Lanjutkan ===== */
+.hnq-mems{display:flex;flex-wrap:wrap;gap:2px 4px;margin-top:2px}
+.hnq-mem{border:0;background:transparent;font:inherit;font-weight:600;font-size:13.5px;color:var(--teks);padding:2px 4px;min-height:30px;border-radius:6px;cursor:pointer;text-align:left}
+.hnq-mem.st{color:var(--abu)}
+.hnq-mem em{font-style:normal;font-size:10.5px;font-weight:700;background:var(--pill-oranye-bg,#fff3e0);color:var(--teks);padding:1px 6px;border-radius:99px;margin-left:3px}
+.hnq-badge{padding:9px 12px;border-radius:10px;background:var(--pill-abu-bg);color:var(--abu);font-weight:700;font-size:13px}
+.hnq-row.sub{margin-left:18px;border-left-color:var(--garis-strong)}
+.hnq-row.bawah .hnq-sc{color:var(--merah);font-weight:700}
+.hnq-reset{min-width:44px;min-height:44px;border:1px solid var(--garis-strong);background:var(--kartu);border-radius:10px;cursor:pointer;font-size:16px;color:var(--abu)}
+.hnq-stat{margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--pill-abu-bg);font-size:12.5px;font-weight:600;line-height:1.5}
+.hnq-hint{display:block;margin-top:8px;color:var(--abu);font-size:12px;line-height:1.4}
+.dash-lanjut-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:52px;padding:8px 12px;margin-top:8px;border:1px solid var(--garis);border-radius:12px;background:var(--kartu);color:var(--teks);font:inherit;text-align:left;cursor:pointer}
+.dash-lanjut-row small{display:block;color:var(--abu);font-size:12px;font-weight:500}
+.dash-lanjut-n{font-weight:700;color:var(--accent);font-size:12.5px;white-space:nowrap}
 </style>
 
 </head>
@@ -933,6 +948,7 @@ details.settings-block[open] summary{margin-bottom:10px;}
       <div id="dashUtsKelasList"></div>
     </div>
 
+    <div class="card" id="dashLanjut" style="display:none"></div>
     <div class="card">
       <h2>Menu Cepat</h2>
       <div class="sub">Ketuk salah satu menu di bawah untuk langsung membuka.</div>
@@ -3008,6 +3024,7 @@ function renderDashboard(){
   const elSemester = document.getElementById('dashSemester');
   const elSync = document.getElementById('dashSyncPill');
   if(!elTgl) return;
+  try{ dashLanjutRender_(); }catch(e){}
 
   const now = new Date();
   elTgl.textContent = now.toLocaleDateString('id-ID', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
@@ -5071,7 +5088,7 @@ function drawHnKolomConfig(){
       if(!(await confirmDialog(`Terapkan "${label}" untuk seluruh siswa di kolom ini?\n\n⚠️ Nilai yang sudah pernah diisi akan DITIMPA.`))) return;
       const siswaList = getSiswaList(kelas).map(s=>s.nama);
       if(!DB.nilaiHarian[tid]) DB.nilaiHarian[tid] = {};
-      siswaList.forEach(nama=> DB.nilaiHarian[tid][nama] = v);
+      siswaList.forEach(nama=>{ if(!hnIsStatus_(DB.nilaiHarian[tid][nama])) DB.nilaiHarian[tid][nama] = v; });
       saveDB(); drawHnTable(); showToast('Nilai massal diterapkan ke semua siswa.');
     });
   });
@@ -5084,7 +5101,7 @@ function drawHnKolomConfig(){
       if(!(await confirmDialog(`Terapkan nilai "${v}" untuk seluruh siswa di kolom ini?\n\n⚠️ Nilai yang sudah pernah diisi akan DITIMPA.`))) return;
       const siswaList = getSiswaList(kelas).map(s=>s.nama);
       if(!DB.nilaiHarian[tid]) DB.nilaiHarian[tid] = {};
-      siswaList.forEach(nama=> DB.nilaiHarian[tid][nama] = v);
+      siswaList.forEach(nama=>{ if(!hnIsStatus_(DB.nilaiHarian[tid][nama])) DB.nilaiHarian[tid][nama] = v; });
       saveDB(); drawHnTable(); showToast('Nilai massal diterapkan ke semua siswa.');
     });
   });
@@ -5151,7 +5168,7 @@ function drawHnTable(){
       const converted = convertNilai(t, raw);
       if(converted!==null) scores.push(converted);
       const noKel = noKelompokSiswa_(t, kelas, nama);
-      cells += `<td>${inputControlForTugas(t, nama, raw)}${noKel? `<span class="kj-tag" title="Nilai sama untuk seluruh anggota kelompok ini">K${noKel}</span>` : ''}</td>`;
+      cells += `<td>${hnIsStatus_(raw) ? `<span class="hnq-badge" title="Ubah di Mode Cepat">${HN_STATUS[raw]}</span>` : inputControlForTugas(t, nama, raw)}${noKel? `<span class="kj-tag" title="Nilai sama untuk seluruh anggota kelompok ini">K${noKel}</span>` : ''}</td>`;
     });
     const rata = scores.length ? Math.round((scores.reduce((a,b)=>a+b,0)/scores.length)*100)/100 : null;
     tbody += `<tr><td>${idx+1}</td><td class="nama">${escapeHtml(nama)}</td>${cells}<td class="${rata!==null?(rata>=70?'ok':'bad'):''}">${rata===null?'-':rata}</td></tr>`;
@@ -5183,7 +5200,7 @@ function drawHnTable(){
     }
     const tKel = DB.tugas.find(x=>x.id===tid);
     // Penilaian kelompok: nilai yang sama otomatis berlaku untuk semua anggota kelompok
-    namaSekelompok_(tKel, currentHnSel().kelas, nama).forEach(n=>{ DB.nilaiHarian[tid][n] = v===''? null : v; });
+    namaSekelompok_(tKel, currentHnSel().kelas, nama).forEach(n=>{ if(n!==nama && hnLindung_(tKel, n)) return; DB.nilaiHarian[tid][n] = v===''? null : v; });
     saveDB();
     redrawHnJagaPosisi_(wrap, tid, nama);
   });
@@ -5277,6 +5294,16 @@ function hnqOpsi_(t){
   if(isPilihan_(t.jenis)) return pilihanOpts_(t).map(o=>({v:o.l, l:o.l}));
   return [];
 }
+const HN_STATUS = {TH:'Tidak hadir', IZ:'Izin/sakit', BM:'Belum kumpul'};
+function hnIsStatus_(v){ return v==='TH' || v==='IZ' || v==='BM'; }
+// Siswa "terlindung": punya status atau nilai individu, sehingga nilai kelompok tidak menimpanya
+function hnLindung_(t, nama){ return hnIsStatus_((DB.nilaiHarian[t.id]||{})[nama]) || !!(t.ind && t.ind[nama]); }
+function hnKkm_(){ return (DB.remedialKKM===undefined || DB.remedialKKM===null) ? 70 : DB.remedialKKM; }
+function hnqGrupRaw_(t, names){
+  const rec = DB.nilaiHarian[t.id] || {}, n = names.find(x=> !hnLindung_(t, x));
+  return rec[n!==undefined ? n : names[0]];
+}
+function hnqAdaKel_(t, kelas){ return getSiswaList(kelas).some(s=> noKelompokSiswa_(t, kelas, s.nama)); }
 function hnqRender_(){
   const box = document.getElementById('hnQuick'); if(!box) return;
   const {mapel, kelas} = currentHnSel();
@@ -5294,7 +5321,7 @@ function hnqRender_(){
     tid = (belum || list[0]).id;
   }
   HNQ.tid = tid; hnqLS_('rn_hnq_'+key, tid);
-  const idx = list.findIndex(t=>t.id===tid), t = list[idx];
+  const idx = list.findIndex(t=>t.id===tid), t = list[idx], adaKel = hnqAdaKel_(t, kelas);
   const mx = hnqIsNum_(t) ? hnqNilaiMaks_(t) : null;
   const fillCtl = hnqIsNum_(t)
     ? `<input type="number" inputmode="decimal" step="any" min="0" max="${mx}" id="hnqFillVal" placeholder="0-${mx}">`
@@ -5309,79 +5336,133 @@ function hnqRender_(){
     <div class="hnq-tools">
       <input type="search" id="hnqCari" placeholder="Cari nama siswa..." value="${escapeHtml(HNQ.cari)}">
       <label><input type="checkbox" id="hnqKosongSaja" ${HNQ.hanyaKosong?'checked':''}> Belum diisi saja</label>
+      ${adaKel ? `<label><input type="checkbox" id="hnqIndiv" ${t.nilaiIndividu?'checked':''}> Nilai individu berbeda</label>` : ''}
     </div>
     <div class="hnq-fill"><span>Isi yang masih kosong dengan:</span>${fillCtl}<button type="button" class="btn secondary" id="hnqFill">Isi kosong</button></div>
+    <small class="hnq-hint">Ketuk nama siswa untuk menandai <b>Tidak hadir → Izin → Belum kumpul</b> (tidak dihitung ke rata-rata).${adaKel ? ' Nilai kelompok tidak menimpa siswa yang ditandai atau yang punya nilai individu.' : ''}</small>
+    <div id="hnqStat" class="hnq-stat"></div>
     <div id="hnqList"></div>`;
   hnqRows_();
 }
 function hnqProg_(){
   const t = hnqTugas_(); if(!t) return;
   const siswa = getSiswaList(currentHnSel().kelas).map(s=>s.nama);
-  const rec = DB.nilaiHarian[t.id] || {};
+  const rec = DB.nilaiHarian[t.id] || {}, kkm = hnKkm_();
   const n = siswa.filter(x=> !hnqKosong_(rec[x])).length;
-  const bar = document.getElementById('hnqBar'), txt = document.getElementById('hnqProgTxt');
+  const bar = document.getElementById('hnqBar'), txt = document.getElementById('hnqProgTxt'), st = document.getElementById('hnqStat');
   if(bar) bar.style.width = (siswa.length ? Math.round(n/siswa.length*100) : 0) + '%';
   if(txt) txt.textContent = n + '/' + siswa.length + ' terisi' + (siswa.length && n===siswa.length ? ' ✓' : '');
-}
-function hnqRowHTML_(t, kelas, nama, no){
-  const raw = (DB.nilaiHarian[t.id]||{})[nama];
-  const kosong = hnqKosong_(raw), sc = convertNilai(t, raw), kel = noKelompokSiswa_(t, kelas, nama);
-  const ang = kel ? namaSekelompok_(t, kelas, nama) : null;
-  let ctl;
-  if(hnqIsNum_(t)){
-    const mx = hnqNilaiMaks_(t);
-    ctl = `<input type="number" inputmode="decimal" enterkeyhint="next" step="any" min="0" max="${mx}" placeholder="0-${mx}" value="${kosong?'':escapeHtml(String(raw))}" aria-label="Nilai ${escapeHtml(nama)}">`;
-  } else {
-    ctl = hnqOpsi_(t).map(o=>`<button type="button" class="hnq-chip${String(raw)===o.v?' on':''}" data-v="${escapeHtml(o.v)}">${escapeHtml(o.l)}</button>`).join('');
+  if(st){
+    const v = siswa.map(x=> convertNilai(t, rec[x])).filter(x=> x!==null);
+    const cnt = {TH:0, IZ:0, BM:0}; siswa.forEach(x=>{ if(hnIsStatus_(rec[x])) cnt[rec[x]]++; });
+    const fmt = x => String(Math.round(x*10)/10).replace('.', ',');
+    let h = v.length
+      ? `Rata-rata <b>${fmt(v.reduce((a,b)=>a+b,0)/v.length)}</b> • Tertinggi <b>${fmt(Math.max(...v))}</b> • Terendah <b>${fmt(Math.min(...v))}</b> • Tuntas <b>${v.filter(x=>x>=kkm).length}/${v.length}</b> (KKM ${kkm})`
+      : 'Belum ada nilai.';
+    const sts = Object.keys(cnt).filter(k=>cnt[k]).map(k=> HN_STATUS[k]+' '+cnt[k]);
+    if(sts.length) h += '<br>' + sts.join(' • ');
+    st.innerHTML = h;
   }
-  return `<div class="hnq-row${kosong?' kosong':''}" data-nama="${escapeHtml(nama)}">${ang ? `<div class="hnq-nm"><span class="hnq-no">K${kel}</span><div class="hnq-grp"><b>Kelompok ${kel}</b><small>${ang.map(escapeHtml).join(', ')}</small></div></div>` : `<div class="hnq-nm"><span class="hnq-no">${no}</span><span>${escapeHtml(nama)}</span></div>`}<div class="hnq-in">${ctl}</div><div class="hnq-sc">${sc===null?'':sc}</div></div>`;
+}
+function hnqRowHTML_(t, kelas, nama, no, mode){
+  mode = mode || 'solo';
+  const esc = escapeHtml, rec = DB.nilaiHarian[t.id] || {};
+  const kel = noKelompokSiswa_(t, kelas, nama);
+  const ang = mode==='g' ? namaSekelompok_(t, kelas, nama) : null;
+  const rep = ang ? (ang.find(n=> !hnLindung_(t, n)) || ang[0]) : nama;
+  const raw = ang ? hnqGrupRaw_(t, ang) : rec[nama];
+  const st = hnIsStatus_(raw) ? raw : '';
+  const kosong = hnqKosong_(raw), sc = convertNilai(t, raw), bawah = sc!==null && sc < hnKkm_();
+  const indiv = !!(t.ind && t.ind[nama]);
+  const memBtn = n => { const s2 = rec[n], ss = hnIsStatus_(s2) ? s2 : '';
+    return `<button type="button" class="hnq-mem${ss?' st':''}" data-mem="${esc(n)}">${esc(n)}${ss?`<em>${ss}</em>`:''}</button>`; };
+  const nm = mode==='g'
+    ? `<div class="hnq-nm"><span class="hnq-no">K${kel}</span><div class="hnq-grp"><b>Kelompok ${kel}</b><div class="hnq-mems">${ang.map(memBtn).join('')}</div></div></div>`
+    : `<div class="hnq-nm"><span class="hnq-no">${mode==='a'?'↳':no}</span>${memBtn(nama)}${mode==='a'&&indiv?'<span class="kj-tag">individu</span>':''}</div>`;
+  let ctl;
+  if(st) ctl = `<span class="hnq-badge">${HN_STATUS[st]}</span>`;
+  else if(hnqIsNum_(t)){
+    const mx = hnqNilaiMaks_(t);
+    ctl = `<input type="number" inputmode="decimal" enterkeyhint="next" step="any" min="0" max="${mx}" placeholder="0-${mx}" value="${kosong?'':esc(String(raw))}" aria-label="Nilai ${esc(nama)}">`;
+  } else {
+    ctl = hnqOpsi_(t).map(o=>`<button type="button" class="hnq-chip${String(raw)===o.v?' on':''}" data-v="${esc(o.v)}">${esc(o.l)}</button>`).join('');
+  }
+  if(mode==='a' && indiv) ctl += `<button type="button" class="hnq-reset" title="Kembalikan ke nilai kelompok" aria-label="Kembalikan ke nilai kelompok">↺</button>`;
+  return `<div class="hnq-row${kosong?' kosong':''}${bawah?' bawah':''}${st?' st':''}${mode==='a'?' sub':''}" data-k="${mode}" data-nama="${esc(rep)}"${mode==='g'?` data-g="${kel}"`:''}>${nm}<div class="hnq-in">${ctl}</div><div class="hnq-sc">${sc===null?'':sc}</div></div>`;
 }
 function hnqRows_(){
   const t = hnqTugas_(), list = document.getElementById('hnqList'); if(!t || !list) return;
   const {kelas} = currentHnSel();
   const rec = DB.nilaiHarian[t.id] || {};
   const cari = (HNQ.cari||'').trim().toLowerCase();
-  // satu baris per kelompok (nilai sama untuk semua anggota), siswa tanpa kelompok tetap per orang
   const seen = {}; let rows = [];
   getSiswaList(kelas).forEach((s,i)=>{
     const kel = noKelompokSiswa_(t, kelas, s.nama);
-    if(kel){ if(seen[kel]) return; seen[kel] = 1; rows.push({nama:s.nama, no:i+1, kel, ang:namaSekelompok_(t, kelas, s.nama)}); }
-    else rows.push({nama:s.nama, no:i+1, kel:0});
+    if(kel){ if(seen[kel]) return; seen[kel] = 1; const ang = namaSekelompok_(t, kelas, s.nama); rows.push({nama:s.nama, no:i+1, kel, ang, raw:hnqGrupRaw_(t, ang)}); }
+    else rows.push({nama:s.nama, no:i+1, kel:0, raw:rec[s.nama]});
   });
   rows.sort((a,b)=> (a.kel||999)-(b.kel||999) || a.no-b.no);
   if(cari) rows = rows.filter(r=> (r.ang||[r.nama]).some(n=> n.toLowerCase().includes(cari)));
-  if(HNQ.hanyaKosong) rows = rows.filter(r=> hnqKosong_(rec[r.nama]));
-  const adaKel = rows.some(r=>r.kel), adaSolo = rows.some(r=>!r.kel);
+  if(HNQ.hanyaKosong) rows = rows.filter(r=> hnqKosong_(r.raw));
+  const adaKel = rows.some(r=>r.kel);
   const tugasAll = hnqTugasList_(), idx = tugasAll.findIndex(x=>x.id===t.id);
-  let html = '', sectSolo = false;
+  let html = '', soloHead = false;
   rows.forEach(r=>{
-    if(!r.kel && adaKel && !sectSolo){ sectSolo = true; html += '<div class="hnq-sec">Tanpa kelompok (dinilai sendiri)</div>'; }
-    html += hnqRowHTML_(t, kelas, r.nama, r.no);
+    if(!r.kel && adaKel && !soloHead){ soloHead = true; html += '<div class="hnq-sec">Tanpa kelompok (dinilai sendiri)</div>'; }
+    html += hnqRowHTML_(t, kelas, r.nama, r.no, r.kel ? 'g' : 'solo');
+    if(r.kel && t.nilaiIndividu) html += r.ang.map(n=> hnqRowHTML_(t, kelas, n, 0, 'a')).join('');
   });
   if(!rows.length) html = `<div class="empty-note">${HNQ.hanyaKosong && !cari ? '🎉 Semua siswa sudah terisi untuk tugas ini.' : 'Tidak ada siswa yang cocok.'}</div>`;
   if(idx < tugasAll.length-1) html += '<button type="button" class="btn hnq-next hnq-go" data-dir="1">Lanjut ke tugas berikutnya ›</button>';
   list.innerHTML = html;
   hnqProg_();
 }
+// Nilai kelompok/solo: menyebar ke anggota, kecuali yang terlindung (status / nilai individu)
 function hnqSet_(t, kelas, nama, v){
   if(!DB.nilaiHarian[t.id]) DB.nilaiHarian[t.id] = {};
-  const names = namaSekelompok_(t, kelas, nama);
-  names.forEach(n=>{ DB.nilaiHarian[t.id][n] = (v==='' || v===null) ? null : v; });
-  saveDB();
-  return names;
+  const val = (v==='' || v===null) ? null : v, names = namaSekelompok_(t, kelas, nama);
+  names.forEach(n=>{ if(n!==nama && hnLindung_(t, n)) return; DB.nilaiHarian[t.id][n] = val; });
+  saveDB(); return names;
 }
-function hnqPatch_(t, kelas, names){
+function hnqSetInd_(t, nama, v){
+  if(!DB.nilaiHarian[t.id]) DB.nilaiHarian[t.id] = {};
+  const val = (v==='' || v===null) ? null : v;
+  if(!t.ind) t.ind = {};
+  DB.nilaiHarian[t.id][nama] = val;
+  if(val===null) delete t.ind[nama]; else t.ind[nama] = 1;
+  saveDB();
+}
+function hnqNilaiKelompokLain_(t, kelas, nama){
+  const rec = DB.nilaiHarian[t.id] || {}, src = namaSekelompok_(t, kelas, nama).find(n=> n!==nama && !hnLindung_(t, n));
+  return (src!==undefined && rec[src]!==undefined) ? rec[src] : null;
+}
+function hnqResetInd_(t, kelas, nama){
+  if(t.ind) delete t.ind[nama];
+  DB.nilaiHarian[t.id][nama] = hnqNilaiKelompokLain_(t, kelas, nama);
+  saveDB();
+}
+function hnqSetStatus_(t, kelas, nama, st){
+  if(!DB.nilaiHarian[t.id]) DB.nilaiHarian[t.id] = {};
+  if(t.ind) delete t.ind[nama];
+  DB.nilaiHarian[t.id][nama] = st ? st : hnqNilaiKelompokLain_(t, kelas, nama);
+  saveDB();
+}
+function hnqRefresh_(t, kelas, names, struktur){
   const list = document.getElementById('hnqList'); if(!list) return;
-  const rows = [].slice.call(list.querySelectorAll('.hnq-row'));
-  names.forEach(n=>{
-    const row = rows.find(r=> r.dataset.nama===n); if(!row) return;
-    if(hnqIsNum_(t)){
-      const raw = (DB.nilaiHarian[t.id]||{})[n], inp = row.querySelector('input'), sc = convertNilai(t, raw);
-      if(inp && document.activeElement!==inp) inp.value = hnqKosong_(raw) ? '' : raw;
+  const kelNo = noKelompokSiswa_(t, kelas, names[0]), rec = DB.nilaiHarian[t.id] || {};
+  [].slice.call(list.querySelectorAll('.hnq-row')).forEach(row=>{
+    const k = row.dataset.k, n = row.dataset.nama;
+    const kena = k==='g' ? (kelNo && +row.dataset.g===kelNo) : names.includes(n);
+    if(!kena) return;
+    const inp = row.querySelector('input');
+    if(!struktur && inp && hnqIsNum_(t)){
+      const raw = k==='g' ? hnqGrupRaw_(t, namaSekelompok_(t, kelas, n)) : rec[n], sc = convertNilai(t, raw);
+      if(document.activeElement!==inp) inp.value = hnqKosong_(raw) ? '' : raw;
       row.querySelector('.hnq-sc').textContent = sc===null ? '' : sc;
       row.classList.toggle('kosong', hnqKosong_(raw));
+      row.classList.toggle('bawah', sc!==null && sc < hnKkm_());
     } else {
-      row.outerHTML = hnqRowHTML_(t, kelas, n, row.querySelector('.hnq-no').textContent);
+      row.outerHTML = hnqRowHTML_(t, kelas, n, row.querySelector('.hnq-no').textContent, k);
     }
   });
   hnqProg_();
@@ -5389,14 +5470,25 @@ function hnqPatch_(t, kelas, names){
 (function(){
   const box = document.getElementById('hnQuick'); if(!box) return;
   const cariDeb = debounce_(()=>hnqRows_(), CARI_DEBOUNCE_MS);
+  const ORDE = ['', 'TH', 'IZ', 'BM'];
   box.addEventListener('click', e=>{
     const t = hnqTugas_(); if(!t) return;
-    const kelas = currentHnSel().kelas;
+    const kelas = currentHnSel().kelas, rec = DB.nilaiHarian[t.id] || {};
+    const mem = e.target.closest('.hnq-mem');
+    if(mem){
+      const n = mem.dataset.mem, cur = hnIsStatus_(rec[n]) ? rec[n] : '';
+      hnqSetStatus_(t, kelas, n, ORDE[(ORDE.indexOf(cur)+1) % ORDE.length]);
+      hnqRefresh_(t, kelas, [n], true); return;
+    }
+    const rst = e.target.closest('.hnq-reset');
+    if(rst){ const n = rst.closest('.hnq-row').dataset.nama; hnqResetInd_(t, kelas, n); hnqRefresh_(t, kelas, namaSekelompok_(t, kelas, n), true); return; }
     const chip = e.target.closest('.hnq-chip');
     if(chip){
-      const nama = chip.closest('.hnq-row').dataset.nama;
-      const cur = (DB.nilaiHarian[t.id]||{})[nama];
-      hnqPatch_(t, kelas, hnqSet_(t, kelas, nama, String(cur)===chip.dataset.v ? null : chip.dataset.v));
+      const row = chip.closest('.hnq-row'), nama = row.dataset.nama, k = row.dataset.k;
+      const cur = k==='g' ? hnqGrupRaw_(t, namaSekelompok_(t, kelas, nama)) : rec[nama];
+      const v = String(cur)===chip.dataset.v ? null : chip.dataset.v;
+      if(k==='a'){ hnqSetInd_(t, nama, v); hnqRefresh_(t, kelas, [nama], true); }
+      else hnqRefresh_(t, kelas, hnqSet_(t, kelas, nama, v), true);
       return;
     }
     const go = e.target.closest('.hnq-go');
@@ -5413,18 +5505,22 @@ function hnqPatch_(t, kelas, names){
         if(hnqKosong_((DB.nilaiHarian[t.id]||{})[s.nama])){ hnqSet_(t, kelas, s.nama, v); n++; }
       });
       hnqRows_();
-      showToast(n ? n+' siswa diisi (nilai yang sudah ada tidak diubah).' : 'Tidak ada sel kosong.');
+      showToast(n ? n+' siswa diisi (nilai & status yang sudah ada tidak diubah).' : 'Tidak ada sel kosong.');
     }
   });
   box.addEventListener('change', e=>{
     const el = e.target;
     if(el.id==='hnqTugas'){ HNQ.tid = el.value; hnqRender_(); return; }
     if(el.id==='hnqKosongSaja'){ HNQ.hanyaKosong = el.checked; hnqRows_(); return; }
+    if(el.id==='hnqIndiv'){ const t = hnqTugas_(); if(t){ t.nilaiIndividu = el.checked; saveDB(); hnqRows_(); } return; }
     const row = el.closest ? el.closest('.hnq-row') : null;
     if(row && el.type==='number'){
       const t = hnqTugas_(); if(!t) return;
-      const kelas = currentHnSel().kelas;
-      hnqPatch_(t, kelas, hnqSet_(t, kelas, row.dataset.nama, el.value.trim()));
+      const kelas = currentHnSel().kelas, nama = row.dataset.nama, val = el.value.trim();
+      if(row.dataset.k==='a'){
+        if(val==='') hnqResetInd_(t, kelas, nama); else hnqSetInd_(t, nama, val);
+        hnqRefresh_(t, kelas, [nama], true);
+      } else hnqRefresh_(t, kelas, hnqSet_(t, kelas, nama, val), false);
     }
   });
   box.addEventListener('input', e=>{
@@ -5440,12 +5536,43 @@ function hnqPatch_(t, kelas, names){
   box.addEventListener('keydown', e=>{
     if(e.key!=='Enter' || e.target.type!=='number') return;
     e.preventDefault();
-    const inputs = [].slice.call(box.querySelectorAll('#hnqList .hnq-row input[type=number]'));
+    const sub = e.target.closest('.hnq-row').classList.contains('sub');
+    const inputs = [].slice.call(box.querySelectorAll(sub ? '#hnqList .hnq-row.sub input[type=number]' : '#hnqList .hnq-row:not(.sub) input[type=number]'));
     const nxt = inputs[inputs.indexOf(e.target)+1];
     if(nxt){ nxt.focus(); try{ nxt.select(); }catch(_){} }
     else { e.target.blur(); showToast('Sudah sampai siswa terakhir.'); }
   });
 })();
+// Beranda: tugas yang nilainya belum lengkap -> buka langsung di Mode Cepat
+function dashLanjutRender_(){
+  const box = document.getElementById('dashLanjut'); if(!box) return;
+  const mulai = [], baru = [];
+  DB.kelasList.forEach(k=>{
+    DB.tugas.forEach(t=>{
+      if(t.kelompok!==k.kelompok || !k.siswa.length) return;
+      const rec = DB.nilaiHarian[t.id] || {};
+      const isi = k.siswa.filter(sw=> !hnqKosong_(rec[sw.nama])).length, kosong = k.siswa.length - isi;
+      if(!kosong) return;
+      (isi>0 ? mulai : baru).push({t, k, kosong});
+    });
+  });
+  mulai.sort((a,b)=> a.kosong-b.kosong);
+  const items = (mulai.length ? mulai : baru.slice(-3).reverse()).slice(0,4);
+  if(!items.length){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  box.innerHTML = `<h2>Lanjutkan Input Nilai</h2><div class="sub">${mulai.length ? 'Tugas yang nilainya belum lengkap.' : 'Tugas yang belum diisi.'}</div>` +
+    items.map(x=>`<button type="button" class="dash-lanjut-row" data-t="${escapeHtml(x.t.id)}" data-k="${escapeHtml(x.k.id)}"><span><b>${escapeHtml(x.t.nama)}</b><small>${escapeHtml(x.t.mapel)} • ${escapeHtml(x.k.nama)}</small></span><span class="dash-lanjut-n">${x.kosong} kosong ›</span></button>`).join('');
+}
+document.getElementById('dashLanjut').addEventListener('click', e=>{
+  const b = e.target.closest('.dash-lanjut-row'); if(!b) return;
+  const t = DB.tugas.find(x=> x.id===b.dataset.t); if(!t) return;
+  hnqLS_('rn_hn_mode', 'cepat');
+  gotoPage('harian');
+  const mp = document.getElementById('hnMapel'), kl = document.getElementById('hnKelas');
+  mp.value = t.mapel; mp.dispatchEvent(new Event('change'));
+  kl.value = b.dataset.k; kl.dispatchEvent(new Event('change'));
+  HNQ.tid = t.id; HNQ.hanyaKosong = true; hnqApplyMode_();
+});
 document.getElementById('hnModeSwitch').addEventListener('click', e=>{
   const b = e.target.closest('button[data-mode]'); if(!b) return;
   hnqLS_('rn_hn_mode', b.dataset.mode); hnqApplyMode_();
@@ -6454,9 +6581,10 @@ function drawRekapTugas(){
     let done = 0;
     let cells = tugasRelevan.map(t=>{
       const raw = (DB.nilaiHarian[t.id]||{})[nama];
-      const filled = raw!==undefined && raw!==null && raw!=='';
+      const stt = hnIsStatus_(raw);
+      const filled = raw!==undefined && raw!==null && raw!=='' && !stt;
       if(filled) done++;
-      return `<td class="${filled?'ok':'bad'}">${filled? '✓' : '✗'}</td>`;
+      return `<td class="${filled?'ok':'bad'}" ${stt?`title="${HN_STATUS[raw]}"`:''}>${stt ? raw : (filled? '✓' : '✗')}</td>`;
     }).join('');
     tbody += `<tr><td>${idx+1}</td><td class="nama">${escapeHtml(nama)}</td>${cells}<td><span class="pill ${done===tugasRelevan.length?'hijau':(done===0?'merah':'abu')}">${done}/${tugasRelevan.length}</span></td></tr>`;
   });
