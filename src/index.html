@@ -1255,6 +1255,7 @@ details.settings-block[open] summary{margin-bottom:10px;}
     <div class="card">
       <h2>Daftar Tugas Tersimpan</h2>
       <div class="row">
+        <div class="field" style="flex:1 1 100%;max-width:100%;"><label style="display:flex;align-items:center;gap:8px;font-weight:600;"><input type="checkbox" id="filterTgIkuti" checked> Tampilkan hanya tugas sesuai Mapel &amp; Kelas yang dipilih di formulir atas</label></div>
         <div class="field"><label>Filter Mapel</label><select id="filterTgMapel"><option value="">Semua</option></select></div>
         <div class="field"><label>Filter Kelas (Paralel)</label><select id="filterTgKelompok"><option value="">Semua</option></select></div>
         <div class="field"><label>Cari Nama Tugas</label><input type="text" id="filterTgCari" placeholder="ketik nama tugas..."></div>
@@ -4770,6 +4771,27 @@ document.getElementById('btnSimpanTugas').addEventListener('click', ()=>{
   }
 });
 
+
+/* ---- Daftar tugas mengikuti pilihan Mapel & Kelas di formulir (default) ---- */
+function tgIkuti_(){ const c = document.getElementById('filterTgIkuti'); return !c || c.checked; }
+function tgSyncFilter_(){
+  const fm = document.getElementById('filterTgMapel'), fk = document.getElementById('filterTgKelompok');
+  const ikuti = tgIkuti_();
+  fm.disabled = fk.disabled = ikuti;
+  if(ikuti){
+    fm.value = document.getElementById('tgMapel').value;
+    fk.value = document.getElementById('tgKelompok').value;
+  }
+}
+(function(){
+  const c = document.getElementById('filterTgIkuti');
+  try{ if(localStorage.getItem('rn_tg_ikuti')==='0') c.checked = false; }catch(e){}
+  c.addEventListener('change', ()=>{
+    try{ localStorage.setItem('rn_tg_ikuti', c.checked ? '1' : '0'); }catch(e){}
+    drawTugasList();
+  });
+  ['tgMapel','tgKelompok'].forEach(id=> document.getElementById(id).addEventListener('change', ()=>{ if(tgIkuti_()) drawTugasList(); }));
+})();
 document.getElementById('filterTgMapel').addEventListener('change', drawTugasList);
 document.getElementById('filterTgKelompok').addEventListener('change', drawTugasList);
 document.getElementById('filterTgCari').addEventListener('input', debounce_(drawTugasList, CARI_DEBOUNCE_MS));
@@ -4805,6 +4827,7 @@ function urutkanTugas(list, mode){
   return arr;
 }
 function drawTugasList(){
+  tgSyncFilter_();
   const fm = document.getElementById('filterTgMapel').value;
   const fk = document.getElementById('filterTgKelompok').value;
   const fc = document.getElementById('filterTgCari').value.trim().toLowerCase();
@@ -4812,7 +4835,7 @@ function drawTugasList(){
   let list = DB.tugas.filter(t => (!fm || t.mapel===fm) && (!fk || t.kelompok===fk) && (!fc || t.nama.toLowerCase().includes(fc)));
   list = urutkanTugas(list, urut);
   const box = document.getElementById('tugasListBox');
-  if(list.length===0){ box.innerHTML = '<div class="empty-note">Belum ada tugas yang cocok dengan filter.</div>'; return; }
+  if(list.length===0){ box.innerHTML = tgIkuti_() ? `<div class="empty-note">Belum ada tugas untuk ${escapeHtml(fm||'-')} • ${escapeHtml(kelompokLabel(fk)||'-')}. Isi formulir di atas untuk menambahkannya.</div>` : '<div class="empty-note">Belum ada tugas yang cocok dengan filter.</div>'; return; }
   box.innerHTML = list.map(t=>{
     const terisi = jumlahNilaiTerisi(t.id);
     const belumAdaNilai = terisi===0;
@@ -4899,6 +4922,7 @@ function mulaiEditTugas(t){
   editingTugasId = t.id;
   document.getElementById('tgMapel').value = t.mapel;
   document.getElementById('tgKelompok').value = t.kelompok;
+  if(tgIkuti_()) drawTugasList();
   document.getElementById('tgTP').value = t.tp;
   document.getElementById('tgNama').value = t.nama;
   document.getElementById('tgNilaiMaks').value = t.nilaiMaks;
@@ -4937,6 +4961,7 @@ function duplikatTugas(t){
   editingTugasId = null; // duplikat selalu jadi tugas BARU, bukan edit tugas asal
   document.getElementById('tgMapel').value = t.mapel;
   document.getElementById('tgKelompok').value = t.kelompok;
+  if(tgIkuti_()) drawTugasList();
   document.getElementById('tgTP').value = t.tp;
   document.getElementById('tgNama').value = t.nama;
   document.getElementById('tgNilaiMaks').value = t.nilaiMaks;
