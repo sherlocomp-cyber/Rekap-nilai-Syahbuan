@@ -1,13 +1,14 @@
 // Menyiapkan folder www/ dari src/index.html:
 //  1) mengunduh library CDN (lz-string, xlsx, jszip, jspdf, ...) agar aplikasi jalan OFFLINE
 //  2) mengunduh font Poppins agar tampilan sama tanpa internet
-//  3) menyisipkan android-shim.js (perbaikan tombol unduh/ekspor di WebView Android)
+//  3) menyisipkan poles tampilan (src/ui-polish.css) dan android-shim.js (perbaikan tombol unduh/ekspor di WebView Android)
 //
 // Pakai:  node scripts/prepare.mjs            (build biasa, butuh internet)
 //         node scripts/prepare.mjs --skip-download   (hanya uji penambalan, tanpa unduh)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { injectPolish } from './polish.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(root, 'src', 'index.html');
@@ -78,7 +79,8 @@ if (fontLink && !skipDownload) {
   }
 }
 
-// 3) Perbaikan khusus Android
+// 3) Poles tampilan + perbaikan khusus Android
+html = injectPolish(html);
 fs.copyFileSync(path.join(root, 'scripts', 'android-shim.js'), path.join(WWW, 'android-shim.js'));
 if (!html.includes('</head>')) throw new Error('Tag </head> tidak ditemukan di index.html');
 html = html.replace('</head>', '<script src="android-shim.js"></script>\n</head>');
