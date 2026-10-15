@@ -45,11 +45,21 @@ jobs:
       - name: Siapkan web (unduh library & font untuk mode offline)
         run: node scripts/prepare.mjs
 
-      - name: Buat proyek Android (ikon, kunci tanda tangan tetap, dll.)
+      - name: Buat proyek Android (ikon, dll.)
         run: |
           npx cap add android
           node scripts/after-add-android.mjs
           npx cap sync android
+
+      - name: Kunci tanda tangan tetap (eksplisit di Gradle)
+        run: |
+          KS="$GITHUB_WORKSPACE/signing/debug.keystore"
+          keytool -list -keystore "$KS" -storepass android > ks.txt
+          cat ks.txt
+          ALIAS="$(grep -i PrivateKeyEntry ks.txt | head -1 | cut -d, -f1)"
+          echo "Alias: $ALIAS"
+          test -n "$ALIAS"
+          node scripts/patch-signing.mjs "$KS" "$ALIAS"
 
       - name: Set versionCode & versionName
         run: |
@@ -60,6 +70,23 @@ jobs:
       - name: Build APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verifikasi tanda tangan APK = kunci repo
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "::warning::apksigner tidak ditemukan, verifikasi dilewati"
+            exit 0
+          fi
+          "$APKSIGNER" verify --print-certs "$APK" | tee apk-cert.txt
+          APK_SHA="$(grep 'certificate SHA-256 digest' apk-cert.txt | head -1 | awk '{print $NF}')"
+          KS_SHA="$(keytool -list -v -keystore signing/debug.keystore -storepass android 2>/dev/null | grep 'SHA256:' | head -1 | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')"
+          echo "APK  : $APK_SHA"
+          echo "Kunci: $KS_SHA"
+          test -n "$APK_SHA"
+          test "$APK_SHA" = "$KS_SHA"
+          echo "CERT_SHA=${APK_SHA}" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -76,6 +103,9 @@ jobs:
           {
             echo "Perubahan:"
             git log -1 --pretty=%B
+            echo
+            echo "Sidik jari tanda tangan (SHA-256): ${CERT_SHA:-tidak tersedia}"
+            echo "(Jika sidik jari ini sama dengan rilis sebelumnya, APK bisa dipasang menimpa tanpa uninstall.)"
             echo
             if [ -f RELEASE_NOTES.md ]; then cat RELEASE_NOTES.md; fi
           } > notes.md
