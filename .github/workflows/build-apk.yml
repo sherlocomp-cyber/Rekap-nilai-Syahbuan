@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK & Deploy Pages
 
 on:
   workflow_dispatch:
@@ -7,9 +7,16 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: rekap-nilai-release
+  cancel-in-progress: false
 
 jobs:
-  build:
+  apk:
+    name: Build APK & Rilis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,18 +51,40 @@ jobs:
           name: rekap-nilai-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Terbitkan rilis (jika versi di package.json belum dirilis)
-        if: github.ref == 'refs/heads/main'
+      - name: Terbitkan rilis baru (otomatis di setiap update)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VER="v$(node -p "require('./package.json').version")"
-          if gh release view "$VER" >/dev/null 2>&1; then
-            echo "Rilis $VER sudah ada, dilewati."
-            exit 0
-          fi
+          BASE="$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")"
+          VER="v${BASE}.${GITHUB_RUN_NUMBER}"
           cp android/app/build/outputs/apk/debug/app-debug.apk "Rekap-Nilai-${VER}.apk"
+          {
+            echo "Perubahan:"
+            git log -1 --pretty=%B
+            echo
+            if [ -f RELEASE_NOTES.md ]; then cat RELEASE_NOTES.md; fi
+          } > notes.md
           gh release create "$VER" "Rekap-Nilai-${VER}.apk" \
             --target "$GITHUB_SHA" \
             --title "Rekap Nilai ${VER}" \
-            --notes-file RELEASE_NOTES.md
+            --notes-file notes.md
+
+  pages:
+    name: Deploy ke GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - name: Unggah versi web (src/)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: src
+
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4
