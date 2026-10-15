@@ -1,0 +1,61 @@
+/* ==========================================================================
+   REKAP NILAI — poles tampilan (lapisan tambahan, hanya memakai token yang
+   sudah ada sehingga otomatis ikut mode terang / gelap / AMOLED).
+   Disisipkan saat build oleh scripts/polish.mjs (setelah <style> utama).
+   ========================================================================== */
+
+/* 1. Sentuhan: tanpa jeda ketuk-ganda, area notch aman ---------------------- */
+button,[role="button"],select,input,textarea,summary,label{touch-action:manipulation;}
+header{padding-top:max(8px,env(safe-area-inset-top));}
+@media (min-width:900px){header{padding-top:max(12px,env(safe-area-inset-top));}}
+
+/* 2. Pergantian halaman lebih halus (hanya opacity, aman untuk elemen fixed) */
+@keyframes rnPageIn{from{opacity:0;}to{opacity:1;}}
+section.page.active{animation:rnPageIn .2s ease-out;}
+
+/* 3. Kartu statistik: lebih ringkas, angka sejajar dengan ikon ---------------- */
+.dash-stat{padding:13px 14px 12px;gap:1px;}
+.dash-stat .num{padding-top:3px;padding-right:42px;font-size:27px;}
+.dash-stat .lbl{margin-top:3px;line-height:1.35;}
+.dash-stat .sub-lbl{margin-top:1px;}
+.dash-stat::before,.dash-stat::after{top:11px;right:11px;}
+
+/* 4. Menu Cepat: dua kolom di HP supaya Beranda tidak terlalu panjang ------- */
+@media (max-width:600px){
+  .dash-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .dash-tile{gap:9px;padding:10px;}
+  .dash-tile-ic{width:34px;height:34px;border-radius:9px;}
+  .dash-tile-label{font-size:12.5px;line-height:1.28;}
+}
+
+/* 5. Tombol cadangan melayang: lebih kecil & lebih tidak mengganggu ---------- */
+#fabBackup{right:12px;bottom:calc(var(--nav-h) + 10px + env(safe-area-inset-bottom));}
+#fabToggle{width:40px;height:40px;opacity:.82;transition:opacity .15s,background .15s;}
+#fabToggle .ic{width:18px;height:18px;}
+#fabToggle:hover,#fabToggle:focus-visible,#fabBackup:focus-within #fabToggle{opacity:1;}
+@media (min-width:900px){#fabBackup{bottom:22px;right:24px;}}
+
+/* 6. Respons sentuh & hover yang konsisten ---------------------------------- */
+.dash-tile,.dash-continue,.dash-todo-item,.dash-lanjut-row,.sheet-group button,.np-grid button{
+  transition:background .14s,border-color .14s,transform .08s,box-shadow .14s;
+}
+.dash-tile:active,.dash-continue:active,.dash-lanjut-row:active,.np-grid button:active{transform:scale(.985);}
+@media (hover:hover){
+  .dash-tile:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);}
+}
+button.btn:not(:disabled):not(.secondary):not(.danger){box-shadow:0 1px 2px color-mix(in srgb,var(--hijau) 35%,transparent);}
+
+/* 7. Tabel nilai: baris selang-seling & fokus input yang jelas -------------- */
+table tbody tr:nth-child(even):not(:hover){background:color-mix(in srgb,var(--surface-2) 72%,var(--kartu));}
+table th{letter-spacing:.01em;}
+.score-input{transition:background .12s,border-color .12s,box-shadow .12s;}
+.score-input:focus{background:var(--hijau-muda);}
+
+/* 8. Kartu & judul: ritme vertikal sedikit lebih lega ----------------------- */
+.card{margin-bottom:14px;}
+.card h2{margin-bottom:5px;}
+.dash-hero{box-shadow:0 10px 24px -14px color-mix(in srgb,var(--hero-1) 70%,transparent);}
+@media (max-width:600px){
+  .dash-hero{padding:16px 16px 17px;}
+  .dash-hero-text h2{margin:3px 0 5px;}
+}
