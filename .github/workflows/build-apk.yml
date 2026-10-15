@@ -100,12 +100,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - uses: actions/configure-pages@v5
 
-      - name: Unggah versi web (src/)
+      - name: Bangun situs (src/ + poles tampilan)
+        run: node scripts/build-pages.mjs
+
+      - name: Unggah situs
         uses: actions/upload-pages-artifact@v3
         with:
-          path: src
+          path: site
 
       - name: Deploy
         id: deploy
