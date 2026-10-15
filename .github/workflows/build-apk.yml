@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
 
 permissions:
   contents: write
@@ -33,20 +36,26 @@ jobs:
       - name: Pasang dependensi
         run: npm install
 
+      - name: Tentukan versi (nomor run = versionCode Android)
+        run: |
+          BASE="$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")"
+          echo "VER=v${BASE}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "VNAME=${BASE}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
       - name: Siapkan web (unduh library & font untuk mode offline)
         run: node scripts/prepare.mjs
 
-      - name: Buat proyek Android
+      - name: Buat proyek Android (ikon, kunci tanda tangan tetap, dll.)
         run: |
           npx cap add android
           node scripts/after-add-android.mjs
           npx cap sync android
 
-      - name: Pasang keystore tetap (agar APK baru bisa menimpa yang lama)
+      - name: Set versionCode & versionName
         run: |
-          mkdir -p ~/.android
-          base64 -d signing/debug.keystore.b64 > ~/.android/debug.keystore
-          keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey
+          sed -i "s/versionCode [0-9]\+/versionCode ${GITHUB_RUN_NUMBER}/; s/versionName \"[^\"]*\"/versionName \"${VNAME}\"/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+          grep -q "versionCode ${GITHUB_RUN_NUMBER}" android/app/build.gradle
 
       - name: Build APK
         working-directory: android
@@ -57,23 +66,30 @@ jobs:
           name: rekap-nilai-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Terbitkan rilis baru (otomatis di setiap update)
+      - name: Terbitkan rilis baru
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          BASE="$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")"
-          VER="v${BASE}.${GITHUB_RUN_NUMBER}"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "Rekap-Nilai-${VER}.apk"
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          cp "$APK" "Rekap-Nilai-${VER}.apk"
+          cp "$APK" "Rekap-Nilai.apk"
           {
             echo "Perubahan:"
             git log -1 --pretty=%B
             echo
             if [ -f RELEASE_NOTES.md ]; then cat RELEASE_NOTES.md; fi
           } > notes.md
-          gh release create "$VER" "Rekap-Nilai-${VER}.apk" \
+          gh release create "$VER" "Rekap-Nilai-${VER}.apk" "Rekap-Nilai.apk" \
             --target "$GITHUB_SHA" \
             --title "Rekap Nilai ${VER}" \
             --notes-file notes.md
+
+      - name: Hapus rilis lama (simpan 10 terbaru)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 200 --json tagName --jq '.[10:] | .[].tagName' \
+            | xargs -r -n1 gh release delete --cleanup-tag --yes
 
   pages:
     name: Deploy ke GitHub Pages
