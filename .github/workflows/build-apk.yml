@@ -42,6 +42,12 @@ jobs:
           node scripts/after-add-android.mjs
           npx cap sync android
 
+      - name: Pasang keystore tetap (agar APK baru bisa menimpa yang lama)
+        run: |
+          mkdir -p ~/.android
+          base64 -d signing/debug.keystore.b64 > ~/.android/debug.keystore
+          keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey
+
       - name: Build APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
