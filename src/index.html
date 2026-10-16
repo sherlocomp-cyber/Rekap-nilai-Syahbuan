@@ -4410,7 +4410,7 @@ function hitungSkorKelompok_(k, dasar){
     (k.siswa||[]).forEach(sw=>{
       const arr = [];
       tugasList.forEach(t=>{
-        const v = convertNilai(t, (DB.nilaiHarian[t.id]||{})[sw.nama]);
+        const v = nilaiAkhir_(t, sw.nama);
         if(v!==null && v!==undefined) arr.push(v);
       });
       if(arr.length) out[siswaKey_(sw)] = Math.round(arr.reduce((x,y)=>x+y,0)/arr.length*100)/100;
@@ -5022,6 +5022,35 @@ function convertNilai(tugas, raw){
   return null;
 }
 
+// Tugas kelompok + nilai individu berbeda:
+// nilai akhir siswa = (nilai kelompok + nilai individu) / 2.
+// Nilai individu tetap disimpan di nilaiHarian[tugas][nama] (t.ind[nama] = penanda),
+// nilai kelompoknya disimpan di t.indG[nama] agar tidak hilang.
+function kelRawUntuk_(t, nama){
+  const rec = DB.nilaiHarian[t.id] || {};
+  if(t.indG && t.indG[nama]!==undefined) return t.indG[nama];
+  if(!hnLindung_(t, nama)) return rec[nama];
+  const kk = t.kelompokSiswa || {};
+  for(const kid in kk){
+    const d = kk[kid]; if(!d || !d.anggota) continue;
+    const list = getSiswaList(kid), sw = list.find(x=>x.nama===nama); if(!sw) continue;
+    const no = d.anggota[siswaKey_(sw)]; if(!no) continue;
+    const o = list.find(x=> x.nama!==nama && d.anggota[siswaKey_(x)]===no && !hnLindung_(t, x.nama));
+    return o ? rec[o.nama] : null;
+  }
+  return null;
+}
+function nilaiAkhirDari_(t, nama, rawInd){
+  const sc = convertNilai(t, rawInd);
+  if(sc===null) return null;
+  const g = convertNilai(t, kelRawUntuk_(t, nama));
+  return g===null ? sc : Math.round((g+sc)/2*100)/100;
+}
+function nilaiAkhir_(t, nama){
+  const raw = (DB.nilaiHarian[t.id]||{})[nama];
+  return (t.ind && t.ind[nama]) ? nilaiAkhirDari_(t, nama, raw) : convertNilai(t, raw);
+}
+
 /* =========================================================================
    NILAI HARIAN
    ========================================================================= */
@@ -5190,7 +5219,7 @@ function drawHnTable(){
       const t = tugasById[tid];
       if(!t){ cells += '<td>-</td>'; return; }
       const raw = (DB.nilaiHarian[tid]||{})[nama];
-      const converted = convertNilai(t, raw);
+      const converted = nilaiAkhir_(t, nama);
       if(converted!==null) scores.push(converted);
       const noKel = noKelompokSiswa_(t, kelas, nama);
       cells += `<td>${hnIsStatus_(raw) ? `<span class="hnq-badge" title="Ubah di Mode Cepat">${HN_STATUS[raw]}</span>` : inputControlForTugas(t, nama, raw)}${noKel? `<span class="kj-tag" title="Nilai sama untuk seluruh anggota kelompok ini">K${noKel}</span>` : ''}</td>`;
@@ -5225,7 +5254,7 @@ function drawHnTable(){
     }
     const tKel = DB.tugas.find(x=>x.id===tid);
     // Penilaian kelompok: nilai yang sama otomatis berlaku untuk semua anggota kelompok
-    namaSekelompok_(tKel, currentHnSel().kelas, nama).forEach(n=>{ if(n!==nama && hnLindung_(tKel, n)) return; DB.nilaiHarian[tid][n] = v===''? null : v; });
+    namaSekelompok_(tKel, currentHnSel().kelas, nama).forEach(n=>{ if(n!==nama && tKel.ind && tKel.ind[n]){ (tKel.indG = tKel.indG || {})[n] = v===''? null : v; return; } if(n!==nama && hnLindung_(tKel, n)) return; DB.nilaiHarian[tid][n] = v===''? null : v; });
     saveDB();
     redrawHnJagaPosisi_(wrap, tid, nama);
   });
@@ -5326,6 +5355,7 @@ function hnLindung_(t, nama){ return hnIsStatus_((DB.nilaiHarian[t.id]||{})[nama
 function hnKkm_(){ return (DB.remedialKKM===undefined || DB.remedialKKM===null) ? 70 : DB.remedialKKM; }
 function hnqGrupRaw_(t, names){
   const rec = DB.nilaiHarian[t.id] || {}, n = names.find(x=> !hnLindung_(t, x));
+  if(n===undefined){ const m = names.find(x=> t.ind && t.ind[x] && t.indG && t.indG[x]!==undefined); if(m!==undefined) return t.indG[m]; }
   return rec[n!==undefined ? n : names[0]];
 }
 function hnqAdaKel_(t, kelas){ return getSiswaList(kelas).some(s=> noKelompokSiswa_(t, kelas, s.nama)); }
@@ -5364,7 +5394,7 @@ function hnqRender_(){
       ${adaKel ? `<label><input type="checkbox" id="hnqIndiv" ${t.nilaiIndividu?'checked':''}> Nilai individu berbeda</label>` : ''}
     </div>
     <div class="hnq-fill"><span>Isi yang masih kosong dengan:</span>${fillCtl}<button type="button" class="btn secondary" id="hnqFill">Isi kosong</button></div>
-    <small class="hnq-hint">Ketuk nama siswa untuk menandai <b>Tidak hadir → Izin → Belum kumpul</b> (tidak dihitung ke rata-rata).${adaKel ? ' Nilai kelompok tidak menimpa siswa yang ditandai atau yang punya nilai individu.' : ''}</small>
+    <small class="hnq-hint">Ketuk nama siswa untuk menandai <b>Tidak hadir → Izin → Belum kumpul</b> (tidak dihitung ke rata-rata).${adaKel ? ' Nilai kelompok tidak menimpa siswa yang ditandai atau yang punya nilai individu. Nilai akhir siswa dengan nilai individu = (nilai kelompok + nilai individu) ÷ 2.' : ''}</small>
     <div id="hnqStat" class="hnq-stat"></div>
     <div id="hnqList"></div>`;
   hnqRows_();
@@ -5378,7 +5408,7 @@ function hnqProg_(){
   if(bar) bar.style.width = (siswa.length ? Math.round(n/siswa.length*100) : 0) + '%';
   if(txt) txt.textContent = n + '/' + siswa.length + ' terisi' + (siswa.length && n===siswa.length ? ' ✓' : '');
   if(st){
-    const v = siswa.map(x=> convertNilai(t, rec[x])).filter(x=> x!==null);
+    const v = siswa.map(x=> nilaiAkhir_(t, x)).filter(x=> x!==null);
     const cnt = {TH:0, IZ:0, BM:0}; siswa.forEach(x=>{ if(hnIsStatus_(rec[x])) cnt[rec[x]]++; });
     const fmt = x => String(Math.round(x*10)/10).replace('.', ',');
     let h = v.length
@@ -5397,7 +5427,7 @@ function hnqRowHTML_(t, kelas, nama, no, mode){
   const rep = ang ? (ang.find(n=> !hnLindung_(t, n)) || ang[0]) : nama;
   const raw = ang ? hnqGrupRaw_(t, ang) : rec[nama];
   const st = hnIsStatus_(raw) ? raw : '';
-  const kosong = hnqKosong_(raw), sc = convertNilai(t, raw), bawah = sc!==null && sc < hnKkm_();
+  const kosong = hnqKosong_(raw), sc = mode==='a' ? nilaiAkhir_(t, nama) : convertNilai(t, raw), bawah = sc!==null && sc < hnKkm_();
   const indiv = !!(t.ind && t.ind[nama]);
   const memBtn = n => { const s2 = rec[n], ss = hnIsStatus_(s2) ? s2 : '';
     return `<button type="button" class="hnq-mem${ss?' st':''}" data-mem="${esc(n)}">${esc(n)}${ss?`<em>${ss}</em>`:''}</button>`; };
@@ -5413,7 +5443,7 @@ function hnqRowHTML_(t, kelas, nama, no, mode){
     ctl = hnqOpsi_(t).map(o=>`<button type="button" class="hnq-chip${String(raw)===o.v?' on':''}" data-v="${esc(o.v)}">${esc(o.l)}</button>`).join('');
   }
   if(mode==='a' && indiv) ctl += `<button type="button" class="hnq-reset" title="Kembalikan ke nilai kelompok" aria-label="Kembalikan ke nilai kelompok">↺</button>`;
-  return `<div class="hnq-row${kosong?' kosong':''}${bawah?' bawah':''}${st?' st':''}${mode==='a'?' sub':''}" data-k="${mode}" data-nama="${esc(rep)}"${mode==='g'?` data-g="${kel}"`:''}>${nm}<div class="hnq-in">${ctl}</div><div class="hnq-sc">${sc===null?'':sc}</div></div>`;
+  return `<div class="hnq-row${kosong?' kosong':''}${bawah?' bawah':''}${st?' st':''}${mode==='a'?' sub':''}" data-k="${mode}" data-nama="${esc(rep)}"${mode==='g'?` data-g="${kel}"`:''}>${nm}<div class="hnq-in">${ctl}</div><div class="hnq-sc"${mode==='a'&&indiv?' title="(nilai kelompok + nilai individu) ÷ 2"':''}>${sc===null?'':sc}</div></div>`;
 }
 function hnqRows_(){
   const t = hnqTugas_(), list = document.getElementById('hnqList'); if(!t || !list) return;
@@ -5446,15 +5476,20 @@ function hnqRows_(){
 function hnqSet_(t, kelas, nama, v){
   if(!DB.nilaiHarian[t.id]) DB.nilaiHarian[t.id] = {};
   const val = (v==='' || v===null) ? null : v, names = namaSekelompok_(t, kelas, nama);
-  names.forEach(n=>{ if(n!==nama && hnLindung_(t, n)) return; DB.nilaiHarian[t.id][n] = val; });
+  names.forEach(n=>{
+    if(t.ind && t.ind[n]){ (t.indG = t.indG || {})[n] = val; return; } // punya nilai individu: simpan sbg nilai kelompoknya
+    if(n!==nama && hnLindung_(t, n)) return;
+    DB.nilaiHarian[t.id][n] = val;
+  });
   saveDB(); return names;
 }
 function hnqSetInd_(t, nama, v){
   if(!DB.nilaiHarian[t.id]) DB.nilaiHarian[t.id] = {};
   const val = (v==='' || v===null) ? null : v;
   if(!t.ind) t.ind = {};
+  if(val!==null && !t.ind[nama]){ if(!t.indG) t.indG = {}; t.indG[nama] = kelRawUntuk_(t, nama); } // simpan nilai kelompok sebelum tertimpa
   DB.nilaiHarian[t.id][nama] = val;
-  if(val===null) delete t.ind[nama]; else t.ind[nama] = 1;
+  if(val===null){ delete t.ind[nama]; if(t.indG) delete t.indG[nama]; } else t.ind[nama] = 1;
   saveDB();
 }
 function hnqNilaiKelompokLain_(t, kelas, nama){
@@ -5462,13 +5497,17 @@ function hnqNilaiKelompokLain_(t, kelas, nama){
   return (src!==undefined && rec[src]!==undefined) ? rec[src] : null;
 }
 function hnqResetInd_(t, kelas, nama){
+  const g = t.indG ? t.indG[nama] : undefined;
   if(t.ind) delete t.ind[nama];
-  DB.nilaiHarian[t.id][nama] = hnqNilaiKelompokLain_(t, kelas, nama);
+  if(t.indG) delete t.indG[nama];
+  const lain = hnqNilaiKelompokLain_(t, kelas, nama);
+  DB.nilaiHarian[t.id][nama] = lain!==null ? lain : (g===undefined ? null : g);
   saveDB();
 }
 function hnqSetStatus_(t, kelas, nama, st){
   if(!DB.nilaiHarian[t.id]) DB.nilaiHarian[t.id] = {};
   if(t.ind) delete t.ind[nama];
+  if(t.indG) delete t.indG[nama];
   DB.nilaiHarian[t.id][nama] = st ? st : hnqNilaiKelompokLain_(t, kelas, nama);
   saveDB();
 }
@@ -5481,7 +5520,7 @@ function hnqRefresh_(t, kelas, names, struktur){
     if(!kena) return;
     const inp = row.querySelector('input');
     if(!struktur && inp && hnqIsNum_(t)){
-      const raw = k==='g' ? hnqGrupRaw_(t, namaSekelompok_(t, kelas, n)) : rec[n], sc = convertNilai(t, raw);
+      const raw = k==='g' ? hnqGrupRaw_(t, namaSekelompok_(t, kelas, n)) : rec[n], sc = k==='a' ? nilaiAkhir_(t, n) : convertNilai(t, raw);
       if(document.activeElement!==inp) inp.value = hnqKosong_(raw) ? '' : raw;
       row.querySelector('.hnq-sc').textContent = sc===null ? '' : sc;
       row.classList.toggle('kosong', hnqKosong_(raw));
@@ -5554,7 +5593,7 @@ function hnqRefresh_(t, kelas, names, struktur){
     const row = el.closest ? el.closest('.hnq-row') : null;
     if(row && el.type==='number'){
       const t = hnqTugas_(); if(!t) return;
-      const sc = convertNilai(t, el.value.trim());
+      const sc = row.dataset.k==='a' ? nilaiAkhirDari_(t, row.dataset.nama, el.value.trim()) : convertNilai(t, el.value.trim());
       row.querySelector('.hnq-sc').textContent = sc===null ? '' : sc;
     }
   });
@@ -5654,7 +5693,7 @@ function drawRekapMapel(){
     let tpAverages = [];
     tpSet.forEach(tp=>{
       const tugasTP = tugasRelevan.filter(t=>t.tp===tp);
-      const nilaiList = tugasTP.map(t=> convertNilai(t, (DB.nilaiHarian[t.id]||{})[nama])).filter(v=>v!==null);
+      const nilaiList = tugasTP.map(t=> nilaiAkhir_(t, nama)).filter(v=>v!==null);
       if(nilaiList.length>0){
         tpAverages.push(Math.round((nilaiList.reduce((a,b)=>a+b,0)/nilaiList.length)*100)/100);
       }
@@ -5669,7 +5708,7 @@ function drawRekapMapel(){
     let tpAverages = [];
     let cells = tpSet.map(tp=>{
       const tugasTP = tugasRelevan.filter(t=>t.tp===tp);
-      const nilaiList = tugasTP.map(t=> convertNilai(t, (DB.nilaiHarian[t.id]||{})[nama])).filter(v=>v!==null);
+      const nilaiList = tugasTP.map(t=> nilaiAkhir_(t, nama)).filter(v=>v!==null);
       if(nilaiList.length===0) return '<td>-</td>';
       const avg = Math.round((nilaiList.reduce((a,b)=>a+b,0)/nilaiList.length)*100)/100;
       tpAverages.push(avg);
@@ -5853,7 +5892,7 @@ function nilaiTPHarianSiswa_(mapel, kelasObj, nama, headers){
   if(!kelasObj) return headers.map(()=>null);
   return headers.map(label=>{
     const tugas = DB.tugas.filter(t=> t.mapel===mapel && t.kelompok===kelasObj.kelompok && String(t.tp)===label);
-    return rataArr_(tugas.map(t=> convertNilai(t, (DB.nilaiHarian[t.id]||{})[nama])).filter(x=> x!==null));
+    return rataArr_(tugas.map(t=> nilaiAkhir_(t, nama)).filter(x=> x!==null));
   });
 }
 function nilaiTPOtoSiswa_(c, mapel, kelasObj, nama, headers){
@@ -5894,7 +5933,7 @@ function rataMapelUntukSiswa(mapel, kelasObj, nama){
   if(tpSet.length===0) return null;
   const tpAverages = [];
   tpSet.forEach(tp=>{
-    const nilaiList = tugasRelevan.filter(t=>t.tp===tp).map(t=> convertNilai(t, (DB.nilaiHarian[t.id]||{})[nama])).filter(v=>v!==null);
+    const nilaiList = tugasRelevan.filter(t=>t.tp===tp).map(t=> nilaiAkhir_(t, nama)).filter(v=>v!==null);
     if(nilaiList.length>0) tpAverages.push(nilaiList.reduce((a,b)=>a+b,0)/nilaiList.length);
   });
   if(tpAverages.length===0) return null;
