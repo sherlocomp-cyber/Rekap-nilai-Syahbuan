@@ -59,3 +59,73 @@ table th{letter-spacing:.01em;}
   .dash-hero{padding:16px 16px 17px;}
   .dash-hero-text h2{margin:3px 0 5px;}
 }
+
+/* ==========================================================================
+   Tahap 2 — dari sudut pandang guru yang sedang menilai
+   ========================================================================== */
+
+/* 9. Entri nilai: baris siswa yang sedang diisi ikut menyala ----------------
+      (kolom nomor & nama ikut karena sel memakai background:inherit) */
+table tbody tr:focus-within,
+table tbody tr:nth-child(even):focus-within{
+  background:color-mix(in srgb,var(--hijau-muda) 60%,var(--kartu));
+}
+table tbody tr:focus-within td.nama{color:var(--hijau-tua);}
+
+/* 10. Kolom nilai: tanpa tombol spinner, angka rata, nilai di luar rentang merah */
+.score-input{-moz-appearance:textfield;appearance:textfield;font-variant-numeric:tabular-nums;}
+.score-input::-webkit-outer-spin-button,
+.score-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.score-input:out-of-range{border-color:var(--merah);background:var(--merah-muda);color:var(--merah);}
+.score-input:out-of-range:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--merah) 25%,transparent);}
+
+/* 11. Header tabel lebih tegas & gulir mendatar tidak menyeret halaman ------- */
+table th{border-bottom:1px solid var(--garis-strong);}
+.table-wrap{overscroll-behavior-x:contain;}
+
+/* 12. Target sentuh ≥ 44px di layar sentuh (jari guru, bukan kursor) --------- */
+@media (pointer:coarse){
+  #tampilanBtn,#themeToggle,.sheet-close,#fabToggle{width:44px;height:44px;}
+  .tp-seg button,.tp-zoom button,.dash-period button,.filter-pill button,.segmented button,
+  .tp-reset,.undo-bar .undo-btn,.dash-settings-link button{min-height:44px;}
+  .kj-select{min-height:40px;height:40px;}
+  .score-input,.table-wrap table select{min-height:40px;}
+  .chk-tugas{width:24px;height:24px;}
+  .chk-clear{min-width:32px;min-height:32px;font-size:15px;}
+}
+
+/* 13. Dialog: tidak terpotong di layar pendek; di HP muncul dari bawah (dekat ibu jari) */
+.modal-box{max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow:auto;}
+@media (max-width:600px){
+  .modal-overlay{align-items:flex-end;padding:12px 12px calc(12px + env(safe-area-inset-bottom));}
+  .modal-box{max-width:none;padding:20px;transform:translateY(18px);}
+  .modal-box .modal-actions{flex-wrap:nowrap;}
+  .modal-box .modal-actions button.btn{flex:1 1 0;min-height:46px;}
+}
+
+/* 14. Keadaan kosong tampak disengaja, bukan layar rusak ------------------- */
+.empty-note:not(td):not(th){border:1px dashed var(--garis-strong);border-radius:var(--r-lg);background:var(--surface-2);}
+
+/* 15. Teks lebih rapi: judul seimbang, paragraf tanpa baris yatim ----------- */
+.card h2,.dash-hero-text h2,.sheet-head strong{text-wrap:balance;}
+.card .sub,.tp-note,small.hint{text-wrap:pretty;}
+
+/* 16. Tombol seragam di desktop; kolom isian bereaksi saat disorot ---------- */
+button.btn:not([style*="padding"]){min-height:40px;}
+@media (hover:hover){
+  select:not(:focus):not(:disabled):not(.kj-select):hover,
+  input:not(:focus):not(:disabled):not([type=checkbox]):not([type=radio]):not([type=file]):hover,
+  textarea:not(:focus):not(:disabled):hover{
+    border-color:color-mix(in srgb,var(--hijau) 45%,var(--garis-strong));
+  }
+}
+
+/* 17. Bilah "urungkan" yang tersembunyi tidak bisa terfokus lewat Tab -------- */
+.undo-bar:not(.show){visibility:hidden;transition:opacity .22s,transform .22s,visibility 0s linear .22s;}
+
+/* 18. Menu bawah (HP): umpan balik ketuk; elemen kemudi tidak ikut terseleksi */
+.mobile-bottom-nav button:active .nav-icon{background:var(--surface-2);}
+.mobile-bottom-nav button.active:active .nav-icon{background:var(--hijau-muda);}
+.mobile-bottom-nav,.sidebar-nav,.dash-tile,.dash-period,.filter-pill,.segmented,.tp-seg,.tp-zoom,.hn-seg{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
