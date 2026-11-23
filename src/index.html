@@ -1152,6 +1152,12 @@ details.settings-block[open] summary{margin-bottom:10px;}
         <button class="btn secondary" id="btnKjTerapkan">Terapkan jumlah soal</button>
         <button class="btn danger" id="btnKjReset">Kosongkan kunci mapel ini</button>
       </div>
+      <div class="row" style="margin-top:10px;">
+        <div class="field" style="flex:2;min-width:220px;"><label>Tempel kunci cepat (mis. BBBAACCDDD…)</label><input type="text" id="kjCepat" placeholder="Huruf A/B/C/D, * = Bonus, - = kosong. Boleh pakai spasi/koma. Huruf Arab أ ب ج د juga bisa." autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btnKjCepat">Terapkan kunci cepat</button>
+      </div>
       <div class="kj-legend">
         <span><i style="background:#2b6cb0"></i> A</span>
         <span><i style="background:#1f7a3d"></i> B</span>
@@ -7059,6 +7065,37 @@ if(btnKjTerapkanEl) btnKjTerapkanEl.addEventListener('click', ()=>{
   const d = getKunciData(mapel, kelompok);
   d.jumlahSoal = Math.max(1, Math.min(200, +document.getElementById('kjJumlahSoal').value || KJ_JUMLAH_SOAL_DEFAULT));
   saveDB(); drawKjGrid(); showToast('Jumlah soal diterapkan.');
+});
+// Isi kunci cepat: tempel satu string (mis. "BBBAACCDDD") lalu semua nomor terisi sekaligus.
+// A/B/C/D = pilihan, * atau X = Bonus, - atau _ atau ? = dikosongkan; huruf Arab أ ب ج د juga dikenali.
+// Spasi, koma, titik, titik koma, garis miring, dan garis tegak diabaikan. Jumlah soal otomatis menyesuaikan panjang string.
+function kjParseCepat_(teks){
+  const peta = {'A':'A','B':'B','C':'C','D':'D','*':'BONUS','X':'BONUS','-':'','_':'','?':'',
+    '\u0623':'A','\u0627':'A','\u0628':'B','\u062C':'C','\u062F':'D'};
+  const bersih = String(teks||'').replace(/[\s,;.\/|\u060C]+/g,'').toUpperCase();
+  const hasil = [];
+  for(const ch of bersih){
+    if(!(ch in peta)) return {galat: ch};
+    hasil.push(peta[ch] || null);
+  }
+  return {jawaban: hasil};
+}
+const btnKjCepatEl = document.getElementById('btnKjCepat');
+if(btnKjCepatEl) btnKjCepatEl.addEventListener('click', async ()=>{
+  const {mapel, kelompok} = currentKjSel();
+  if(!mapel || !kelompok) return showToast('Pilih mata pelajaran dan tingkat kelas dulu.');
+  const inp = document.getElementById('kjCepat');
+  const r = kjParseCepat_(inp.value);
+  if(r.galat) return showToast('Karakter tidak dikenali: "'+r.galat+'". Pakai A/B/C/D, * (Bonus), atau - (kosong).');
+  if(!r.jawaban.length) return showToast('Isi kunci dulu, mis. BBBAACCDDD.');
+  if(r.jawaban.length > 200) return showToast('Maksimal 200 soal.');
+  const d = getKunciData(mapel, kelompok);
+  const adaIsi = d.jawaban.some(v=>v);
+  if(adaIsi && !(await confirmDialog('Kunci untuk "'+mapel+'" — Kelas '+kelompok+' sudah terisi. Timpa dengan '+r.jawaban.length+' jawaban baru?', {confirmLabel:'Timpa', danger:true}))) return;
+  d.jumlahSoal = r.jawaban.length;
+  d.jawaban = r.jawaban;
+  saveDB(); drawKjGrid(); inp.value = '';
+  showToast('Kunci cepat diterapkan: '+r.jawaban.length+' soal.');
 });
 const btnKjResetEl = document.getElementById('btnKjReset');
 if(btnKjResetEl) btnKjResetEl.addEventListener('click', async ()=>{
