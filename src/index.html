@@ -393,8 +393,12 @@ table td.bad{color:var(--bad-text);font-weight:700;}
 .table-wrap table th:nth-child(2),.table-wrap table td:nth-child(2){position:sticky;left:38px;z-index:3;border-right:1px solid var(--garis);box-shadow:6px 0 8px -6px rgba(15,28,23,.14);}
 .table-wrap table th:first-child,.table-wrap table th:nth-child(2){z-index:4;background:var(--surface-2);}
 .table-wrap table td:first-child,.table-wrap table td:nth-child(2){background:inherit;}
-.score-input{width:58px;min-width:58px;min-height:34px;padding:5px 4px;text-align:center;font-size:13.5px;font-weight:600;border-radius:8px;}
-.table-wrap table select{min-height:34px;padding:4px 28px 4px 8px;font-size:13px;}
+.score-input{width:72px;min-width:72px;min-height:36px;padding:5px 4px;text-align:center;text-align-last:center;font-size:14px;font-weight:700;border-radius:8px;}
+/* Dropdown nilai di tabel: padding kiri-kanan simetris + panah kecil di tepi kanan,
+   supaya angka (mis. 20) selalu terlihat penuh di HP maupun mode desktop. */
+.table-wrap table select{min-height:36px;padding:4px 20px;font-size:14px;text-align:center;text-align-last:center;background-position:right 6px center;background-size:11px;}
+.table-wrap table select.score-input{width:72px;min-width:72px;}
+.table-wrap table select.score-input option{text-align:center;}
 .chk-cell{display:inline-flex;align-items:center;justify-content:center;gap:6px;}
 .chk-tugas{width:19px;height:19px;margin:0;}
 .chk-clear{border:0;background:none;color:var(--abu);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;}
@@ -583,7 +587,8 @@ details.settings-block[open] summary{margin-bottom:10px;}
   .scroll-hint{display:block;}
   button.btn:not([style*="padding"]){min-height:42px;}
   .btn-row .btn{flex:1 1 140px;}
-  .score-input{width:52px;min-width:52px;}
+  .score-input,.table-wrap table select.score-input{width:70px;min-width:70px;}
+  .table-wrap table select{font-size:16px;padding:4px 18px;}
   .kj-grid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px 12px;}
   .dash-hero{padding:18px 16px;}
   .dash-hero-text h2{font-size:21px;}
