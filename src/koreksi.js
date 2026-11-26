@@ -3,9 +3,11 @@
    scripts/polish.mjs, tepat sebelum </body>, setelah ui-polish.js).
    Alur: pilih Ujian + Mapel + Kelas -> pilih siswa -> tab Bagian A / B / C.
    Bagian A: ketik jawaban pilihan ganda (Q=A, W=B, E=C, R=D) atau tombol besar A/B/C/D.
-   Bagian B: kunci isian tampil per soal + tombol Benar/Salah.
+   Bagian B: kunci isian tampil per soal + tombol Benar/Salah. Bobot: 1 soal benar = 2 poin (BOBOT_B).
    Bagian C: kunci + kriteria skor 0-4 tampil per soal; ketuk kriteria yang cocok = skor.
-   Nilai tiap bagian = jumlah skor / skor maksimal x maks nilai/bagian (dibulatkan saat dikirim ke UTS/STS).
+   Nilai A & C = skor / skor maksimal x maks nilai/bagian. Nilai B = benar x BOBOT_B (maks = maks nilai/bagian).
+   Nilai Akhir (tampil di atas kartu siswa bila A, B, C lengkap) memakai rumus fitur UTS/STS:
+   total = A+B+C (tiap bagian dibulatkan seperti saat dikirim), akhir = round(total / (maks x 3) x 100).
    Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}}, waktu:{key:{siswaId:{d,t}}},
                         skorB:{key:{siswaId:"10-1"}}, skorC:{key:{siswaId:"43-0"}} }
    (nilai berupa string/angka agar aman digabung oleh mergeDeep_ saat sinkron)
@@ -16,6 +18,7 @@
 if(typeof DB === 'undefined' || typeof PAGES === 'undefined' || document.getElementById('page-koreksi')) return;
 
 var SEL_KEY = 'appRekapNilaiSekolah_v2_koreksiSel';
+var BOBOT_B = 2; /* poin per soal Bagian B yang benar */
 var K = { ujian:'', mapel:'', kelas:'', siswaId:'', pos:0, panel:'', bag:'A' };
 
 /* ---------- util ---------- */
@@ -129,12 +132,25 @@ function setSkor(j,id,n,i,ch){
   var s=pad(st[key][id],n,'-');
   st[key][id]=s.slice(0,i)+ch+s.slice(i+1);
 }
-/* ringkasan B/C satu siswa: {n, terisi, jml, nilai} */
+/* ringkasan B/C satu siswa: {n, terisi, jml, nilai}
+   B: jml = jumlah soal benar, nilai = jml x BOBOT_B (maks = maks nilai/bagian)
+   C: jml = jumlah skor 0-4, nilai = jml / (n x 4) x maks nilai/bagian */
 function ringkasBC(j,kd,id){
   var items=(j==='B')?itemsB(kd):itemsC(kd), n=items.length, s=skorStr(j,id,n), jml=0, terisi=0;
   for(var i=0;i<n;i++){ var ch=s.charAt(i); if(ch!=='-'){ terisi++; jml+=parseInt(ch,10)||0; } }
-  var maksTotal=(j==='B')?n:n*4;
-  return {n:n, terisi:terisi, jml:jml, nilai: maksTotal ? Math.round(jml/maksTotal*maksBagian()*100)/100 : 0};
+  var nilai;
+  if(j==='B') nilai=Math.round(Math.min(maksBagian(), jml*BOBOT_B)*100)/100;
+  else nilai = n ? Math.round(jml/(n*4)*maksBagian()*100)/100 : 0;
+  return {n:n, terisi:terisi, jml:jml, nilai:nilai};
+}
+/* Nilai Akhir seperti fitur UTS/STS: hanya bila A, B, C terisi semua.
+   Tiap bagian dibulatkan dulu (sama seperti yang dikirim ke tabel UTS/STS). */
+function nilaiAkhirSiswa(kd,id){
+  var rA=hitung(kd,jawabSiswa(id,kd.n)), rB=ringkasBC('B',kd,id), rC=ringkasBC('C',kd,id);
+  if(rA.terisi<kd.n || !rB.n || rB.terisi<rB.n || !rC.n || rC.terisi<rC.n) return null;
+  var a=Math.round(nilaiA(rA.benar,kd.n)), b=Math.round(rB.nilai), c=Math.round(rC.nilai);
+  var maks3=maksBagian()*3, total=a+b+c;
+  return {a:a, b:b, c:c, total:total, maks3:maks3, akhir:Math.round((total/maks3)*100)};
 }
 
 /* ---------- Prompt master + parser ---------- */
@@ -264,7 +280,13 @@ css.textContent=[
 '#page-koreksi .kk-skala .kk-sk{display:flex;gap:10px;align-items:flex-start;text-align:left;font-weight:500;font-size:14px;line-height:1.35;}',
 '#page-koreksi .kk-skala .kk-sk b{font-size:20px;min-width:22px;line-height:1.1;}',
 '#page-koreksi .kk-skala .kk-sk.on{background:var(--hijau-muda);border-color:var(--hijau);color:var(--hijau-tua);}',
-'#page-koreksi .kk-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}'
+'#page-koreksi .kk-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}',
+/* banner Nilai Akhir di atas kartu siswa */
+'#page-koreksi .kk-akhir{display:flex;align-items:center;gap:14px;margin:6px 0 10px;padding:10px 14px;border-radius:var(--r-lg);border:2px solid var(--hijau);background:var(--hijau-muda);color:var(--hijau-tua);}',
+'#page-koreksi .kk-akhir-n{font-size:46px;font-weight:800;line-height:1;text-align:center;}',
+'#page-koreksi .kk-akhir-n small{display:block;font-size:12px;font-weight:700;margin-top:4px;opacity:.8;}',
+'#page-koreksi .kk-akhir-d{font-size:14px;line-height:1.5;}',
+'#page-koreksi .kk-akhir.belum{display:block;border:1px dashed var(--garis-strong);background:var(--surface-2);color:var(--abu);font-size:13px;padding:8px 12px;}'
 ].join('\n');
 document.head.appendChild(css);
 
@@ -272,7 +294,7 @@ document.head.appendChild(css);
 var sec=document.createElement('section'); sec.className='page'; sec.id='page-koreksi';
 sec.innerHTML=
 '<div class="card"><h2>Koreksi Soal</h2>'+
-'<div class="sub">Pilih ujian, mapel, kelas, lalu siswa. <b>Bagian A</b> diketik cepat dengan keyboard <b>Q=A, W=B, E=C, R=D</b> atau tombol besar. <b>Bagian B &amp; C</b> dinilai di tab masing-masing, kunci tampil di tiap soal.</div>'+
+'<div class="sub">Pilih ujian, mapel, kelas, lalu siswa. <b>Bagian A</b> diketik cepat dengan keyboard <b>Q=A, W=B, E=C, R=D</b> atau tombol besar. <b>Bagian B</b> (1 soal = 2 poin) &amp; <b>C</b> dinilai di tab masing-masing, kunci tampil di tiap soal. Nilai akhir muncul di atas bila A, B, C sudah terisi semua.</div>'+
 '<div class="row">'+
 '<div class="field"><label>Ujian</label><select id="kkUjian" class="sel-ujian"></select></div>'+
 '<div class="field"><label>Mata Pelajaran</label><select id="kkMapel"></select></div>'+
@@ -377,17 +399,16 @@ function bodyA(kd,s){
   if(kd.a.indexOf('-')>=0) h+='<div class="kk-warn">⚠ Ada soal yang kuncinya belum terisi (tanda –). Soal itu dianggap salah untuk semua siswa sampai kuncinya diisi.</div>';
   return h;
 }
-/* isi tab Bagian B: kunci isian per soal + Benar/Salah */
+/* isi tab Bagian B: kunci isian per soal + Benar/Salah (benar = BOBOT_B poin) */
 function bodyB(kd,s){
   var it=itemsB(kd);
   if(!it.length) return '<div class="empty-note">Kunci Bagian B belum ada. Isi lewat “Atur Kunci Manual” atau “Tempel Kunci dari AI”.</div>';
-  var str=skorStr('B',s.id,it.length), r=ringkasBC('B',kd,s.id), benar=0, i;
-  for(i=0;i<it.length;i++) if(str.charAt(i)==='1') benar++;
-  var h='<div class="kk-info">Benar <span class="kk-skor">'+benar+' / '+it.length+'</span> · Nilai B: <span class="kk-skor">'+(r.terisi?r.nilai:'–')+'</span> (maks '+maksBagian()+') · terisi '+r.terisi+'/'+it.length+'</div>';
+  var str=skorStr('B',s.id,it.length), r=ringkasBC('B',kd,s.id), i;
+  var h='<div class="kk-info">Benar <span class="kk-skor">'+r.jml+' / '+it.length+'</span> · Poin <span class="kk-skor">'+(r.jml*BOBOT_B)+' / '+(it.length*BOBOT_B)+'</span> (1 soal = '+BOBOT_B+' poin) · Nilai B: <span class="kk-skor">'+(r.terisi?r.nilai:'–')+'</span> (maks '+maksBagian()+') · terisi '+r.terisi+'/'+it.length+'</div>';
   it.forEach(function(x,idx){
     var ch=str.charAt(idx);
     h+='<div class="kk-bc'+(ch!=='-'?' sudah':'')+'"><div class="kk-bc-kunci"><b>'+esc(x.no)+'.</b> '+esc(x.teks)+'</div>'+
-       '<div class="kk-bc-aksi"><button class="kk-sk ok'+(ch==='1'?' on':'')+'" data-kk-b="'+idx+':1">✓ Benar</button>'+
+       '<div class="kk-bc-aksi"><button class="kk-sk ok'+(ch==='1'?' on':'')+'" data-kk-b="'+idx+':1">✓ Benar (+'+BOBOT_B+')</button>'+
        '<button class="kk-sk no'+(ch==='0'?' on':'')+'" data-kk-b="'+idx+':0">✗ Salah</button></div></div>';
   });
   return h;
@@ -408,6 +429,13 @@ function bodyC(kd,s){
   });
   return h;
 }
+/* banner Nilai Akhir di atas kartu siswa */
+function bannerAkhir(kd,s){
+  var x=nilaiAkhirSiswa(kd,s.id);
+  if(!x) return '<div class="kk-akhir belum">Nilai akhir muncul setelah Bagian A, B, dan C terisi semua.</div>';
+  return '<div class="kk-akhir"><div class="kk-akhir-n">'+x.akhir+'<small>NILAI AKHIR</small></div>'+
+    '<div class="kk-akhir-d">Total <b>'+x.total+' / '+x.maks3+'</b><br>A '+x.a+' + B '+x.b+' + C '+x.c+'</div></div>';
+}
 function panelKoreksi(){
   var kd=getKunci(false), el=$('kkPanel'); if(!el||!kd) return;
   var s=siswaAktif();
@@ -415,6 +443,7 @@ function panelKoreksi(){
   var rA=hitung(kd,jawabSiswa(s.id,kd.n)), rB=ringkasBC('B',kd,s.id), rC=ringkasBC('C',kd,s.id);
   function tab(kode,judul,info){ return '<button class="kk-tab'+(K.bag===kode?' aktif':'')+'" data-kk-bag="'+kode+'">'+judul+'<small>'+info+'</small></button>'; }
   var h='<div class="card"><p class="kk-nama">'+esc(s.nama)+'</p>'+
+    bannerAkhir(kd,s)+
     '<div class="kk-tabs">'+
       tab('A','Bagian A',rA.terisi+'/'+kd.n)+
       tab('B','Bagian B',rB.n?(rB.terisi+'/'+rB.n):'–')+
@@ -432,14 +461,14 @@ function tabelHasil(){
   var total=0, jml=0;
   var rows=siswaList().map(function(s,i){
     var r=hitung(kd,jawabSiswa(s.id,kd.n)), done=r.terisi>=kd.n, dt=detikWaktu(s.id,done);
-    var rb=ringkasBC('B',kd,s.id), rc=ringkasBC('C',kd,s.id);
+    var rb=ringkasBC('B',kd,s.id), rc=ringkasBC('C',kd,s.id), ak=nilaiAkhirSiswa(kd,s.id);
     if(done && dt!=null){ total+=dt; jml++; }
-    return '<tr><td>'+(i+1)+'</td><td>'+esc(s.nama)+'</td><td>'+(r.terisi?r.benar+' / '+kd.n:'–')+'</td><td>'+(r.terisi?nilaiA(r.benar,kd.n):'–')+'</td><td>'+(rb.terisi?rb.nilai:'–')+'</td><td>'+(rc.terisi?rc.nilai:'–')+'</td><td>'+(dt==null?'–':fmtWaktu(dt)+(done?'':' …'))+'</td></tr>';
+    return '<tr><td>'+(i+1)+'</td><td>'+esc(s.nama)+'</td><td>'+(r.terisi?r.benar+' / '+kd.n:'–')+'</td><td>'+(r.terisi?nilaiA(r.benar,kd.n):'–')+'</td><td>'+(rb.terisi?rb.nilai:'–')+'</td><td>'+(rc.terisi?rc.nilai:'–')+'</td><td><b>'+(ak?ak.akhir:'–')+'</b></td><td>'+(dt==null?'–':fmtWaktu(dt)+(done?'':' …'))+'</td></tr>';
   }).join('');
   var ringkas=jml?('<div class="kk-info">Waktu koreksi Bagian A: total <b>'+fmtWaktu(total)+'</b> untuk '+jml+' siswa · rata-rata <b>'+fmtWaktu(total/jml)+'</b> per siswa (jeda lebih dari '+IDLE_MAX+' dtk dihitung '+IDLE_MAX+' dtk).</div>'):'';
-  el.innerHTML='<div class="card kk-hasil"><h3 style="margin:0 0 6px;">Hasil Koreksi</h3><div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Benar A</th><th>Nilai A</th><th>Nilai B</th><th>Nilai C</th><th>Waktu A</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+ringkas+
+  el.innerHTML='<div class="card kk-hasil"><h3 style="margin:0 0 6px;">Hasil Koreksi</h3><div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Benar A</th><th>Nilai A</th><th>Nilai B</th><th>Nilai C</th><th>Nilai Akhir</th><th>Waktu A</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+ringkas+
     '<div class="btn-row" style="margin-top:10px;"><button class="btn" id="kkKirim">Terapkan Nilai A, B &amp; C ke menu Nilai UTS/STS</button></div>'+
-    '<div class="kk-info">Hanya bagian yang sudah ada isinya yang dikirim. Nilai dibulatkan ke bilangan bulat karena pilihan di tabel UTS/STS berupa angka bulat.</div></div>';
+    '<div class="kk-info">Hanya bagian yang sudah ada isinya yang dikirim. Nilai dibulatkan ke bilangan bulat karena pilihan di tabel UTS/STS berupa angka bulat. Nilai Akhir = total A+B+C ÷ (maks × 3) × 100, sama seperti di menu UTS/STS (katrol dihitung di sana).</div></div>';
 }
 function segarkan(){ daftarSiswa(); panelKoreksi(); tabelHasil(); }
 
