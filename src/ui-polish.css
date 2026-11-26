@@ -72,8 +72,11 @@ table tbody tr:nth-child(even):focus-within{
 }
 table tbody tr:focus-within td.nama{color:var(--hijau-tua);}
 
-/* 10. Kolom nilai: tanpa tombol spinner, angka rata, nilai di luar rentang merah */
-.score-input{-moz-appearance:textfield;appearance:textfield;font-variant-numeric:tabular-nums;}
+/* 10. Kolom nilai: tanpa tombol spinner, angka rata, nilai di luar rentang merah.
+       Hanya untuk <input>; <select> (dropdown nilai UTS/STS) jangan ikut kena
+       appearance:textfield karena itu merusak padding & panahnya. */
+input.score-input{-moz-appearance:textfield;appearance:textfield;}
+.score-input{font-variant-numeric:tabular-nums;}
 .score-input::-webkit-outer-spin-button,
 .score-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .score-input:out-of-range{border-color:var(--merah);background:var(--merah-muda);color:var(--merah);}
@@ -128,4 +131,22 @@ button.btn:not([style*="padding"]){min-height:40px;}
 .mobile-bottom-nav button.active:active .nav-icon{background:var(--hijau-muda);}
 .mobile-bottom-nav,.sidebar-nav,.dash-tile,.dash-period,.filter-pill,.segmented,.tp-seg,.tp-zoom,.hn-seg{
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+
+/* 19. Dropdown nilai A/B/C (UTS/STS): angka harus terlihat penuh --------------
+       Lebar diperbesar, padding kiri-kanan simetris untuk panah, teks tidak
+       dipotong, dan warna teks eksplisit supaya selalu kontras. */
+.table-wrap table select.score-input{
+  -webkit-appearance:none;appearance:none;
+  width:88px;min-width:88px;
+  padding:4px 24px 4px 24px;
+  text-align:center;text-align-last:center;
+  text-overflow:clip;overflow:visible;
+  font-size:16px;font-weight:700;line-height:1.2;
+  color:var(--teks);
+  background-position:right 7px center;background-size:11px;
+}
+.table-wrap table select.score-input option{color:var(--teks);background:var(--kartu);}
+@media (max-width:600px){
+  .table-wrap table select.score-input{width:80px;min-width:80px;padding:4px 20px;background-position:right 5px center;}
 }
