@@ -18,9 +18,10 @@
    - Daftar siswa menampilkan penanda A/B/C + filter "hanya yang belum selesai".
    - Header kartu siswa menempel (nama, skor sementara, tab) saat digulir.
    - Tombol Urungkan (maks 30 langkah, A/B/C).
+   - Bagian A: opsi "Kosong = salah" (Spasi) untuk soal yang tidak dijawab siswa; terhitung sudah dinilai dan salah.
    - Analisis Soal: persentase tuntas per soal + pilihan salah terbanyak (A), soal tersulit.
 
-   Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}}, waktu:{key:{siswaId:{d,t}}},
+   Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-X.."}}  (X = soal kosong/tidak dijawab = salah, '-' = belum dinilai), waktu:{key:{siswaId:{d,t}}},
                         skorB:{key:{siswaId:"2-10"}}  (poin per soal 0-2, '-' = belum),
                         skorC:{key:{siswaId:"43-0"}}  (skor per soal 0-4, '-' = belum) }
    (nilai berupa string/angka agar aman digabung oleh mergeDeep_ saat sinkron)
@@ -515,7 +516,7 @@ function bodyA(kd,s){
     var kc=kd.a.charAt(i), j=jw.charAt(i), cls='kk-c';
     if(j!=='-' || kc==='*'){ cls+=(kc==='*' || (kc!=='-' && j===kc))?' ok':' no'; }
     if(i===K.pos) cls+=' cur';
-    strip+='<button class="'+cls+'" data-kk-pos="'+i+'" title="Soal '+(i+1)+'">'+(i+1)+(j!=='-'?j:'')+'</button>';
+    strip+='<button class="'+cls+'" data-kk-pos="'+i+'" title="Soal '+(i+1)+'">'+(i+1)+(j==='X'?'∅':(j!=='-'?j:''))+'</button>';
   }
   var h='<div class="kk-info">Benar <span class="kk-skor">'+r.benar+' / '+kd.n+'</span> · Nilai A: <span class="kk-skor">'+nilaiA(r.benar,kd.n)+'</span> (maks '+maksBagian()+')'+
     ' · ⏱ <span class="kk-skor" id="kkTimer">'+(detikWaktu(s.id,r.terisi>=kd.n)==null?'mulai saat soal 1 diisi':fmtWaktu(detikWaktu(s.id,r.terisi>=kd.n)))+'</span></div>';
@@ -524,9 +525,9 @@ function bodyA(kd,s){
   } else {
     h+='<div class="kk-no">Soal '+(K.pos+1)+' <small>dari '+kd.n+'</small></div>'+
       '<div class="kk-abcd"><button data-kk-j="A">A<small>Q</small></button><button data-kk-j="B">B<small>W</small></button><button data-kk-j="C">C<small>E</small></button><button data-kk-j="D">D<small>R</small></button></div>'+
-      '<div class="btn-row"><button class="btn secondary" id="kkLewati">Kosong / lewati (Spasi)</button><button class="btn secondary" id="kkMundur">⌫ Mundur &amp; hapus</button></div>';
+      '<div class="btn-row"><button class="btn secondary" id="kkLewati">Kosong = salah (Spasi)</button><button class="btn secondary" id="kkMundur">⌫ Mundur &amp; hapus</button></div>';
   }
-  h+='<div class="kk-strip">'+strip+'</div><div class="kk-info">Keyboard: Q W E R = A B C D · Spasi = kosong · Backspace = mundur · ← → pindah soal · Enter = siswa berikutnya</div>';
+  h+='<div class="kk-strip">'+strip+'</div><div class="kk-info">Keyboard: Q W E R = A B C D · Spasi = tidak dijawab (dianggap salah) · Backspace = mundur · ← → pindah soal · Enter = siswa berikutnya</div>';
   if(kd.a.indexOf('-')>=0) h+='<div class="kk-warn">⚠ Ada soal yang kuncinya belum terisi (tanda –). Soal itu dianggap salah untuk semua siswa sampai kuncinya diisi.</div>';
   return h;
 }
@@ -614,7 +615,7 @@ function analisisSoal(kd){
     if(!terisi) return;
     var top='', tm=0;
     Object.keys(salah).forEach(function(k){ if(salah[k]>tm){ tm=salah[k]; top=k; } });
-    baris.push({bag:'A', no:String(i+1), n:terisi, pct:Math.round(benar/terisi*100), cat:(top && kc!=='*') ? ('salah terbanyak memilih '+top+' ('+tm+' siswa)') : ''});
+    baris.push({bag:'A', no:String(i+1), n:terisi, pct:Math.round(benar/terisi*100), cat:(top && kc!=='*') ? (top==='X' ? ('paling banyak tidak dijawab ('+tm+' siswa)') : ('salah terbanyak memilih '+top+' ('+tm+' siswa)')) : ''});
   }
   for(var i=0;i<kd.n;i++) tambahA(i);
   [['B',itemsB(kd),BOBOT_B],['C',itemsC(kd),4]].forEach(function(g){
@@ -815,17 +816,7 @@ sec.addEventListener('click',function(e){
   if(b.id==='kkSimpanBC'){
     var d2=getKunci(true); d2.b=($('kkB')||{}).value.trim(); d2.c=($('kkC')||{}).value.trim(); simpan(); render(); toast('Kunci B & C tersimpan.'); return;
   }
-  if(b.id==='kkLewati'){
-    var kd3=getKunci(false), s3=siswaAktif();
-    if(kd3&&s3&&K.pos<kd3.n){
-      var jw=jawabSiswa(s3.id,kd3.n);
-      pushUndo(snapA(s3,jw));
-      if(getWaktu()[s3.id]) catatWaktu(s3.id,false);
-      getJawab()[s3.id]=jw.slice(0,K.pos)+'-'+jw.slice(K.pos+1);
-      K.pos++; simpan(); segarkan();
-    }
-    return;
-  }
+  if(b.id==='kkLewati'){ jawab('X'); return; }
   if(b.id==='kkMundur'){ mundur(); return; }
   if(b.id==='kkNext'){ berikutnya(); return; }
   if(b.id==='kkNextBag'){ berikutnyaBag(); return; }
