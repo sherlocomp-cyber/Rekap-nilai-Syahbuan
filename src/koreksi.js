@@ -4,6 +4,7 @@
    Alur: pilih Ujian + Mapel + Kelas -> pilih siswa -> ketik jawaban
    pilihan ganda (Q=A, W=B, E=C, R=D) atau tekan tombol besar A/B/C/D.
    Bagian B & C: hanya menampilkan kunci (dikoreksi manual).
+   Bagian C: kunci + kriteria skor 0-4 per soal (dari prompt master).
    Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}} }
    (semua nilai berupa string agar aman digabung oleh mergeDeep_ saat sinkron)
    Kunci lama di fitur Ujian (DB.kunciJawaban) TIDAK dipakai.
@@ -87,7 +88,7 @@ function promptMaster(){
     '1 | kunci isian singkat',
     '2 | kunci isian singkat',
     'C',
-    '1 | poin kunci 1 ; poin kunci 2 ; poin kunci 3',
+    '1 | KUNCI: jawaban ideal singkat | 4: sempurna, memuat semua poin kunci | 3: kurang sedikit (satu poin kurang/keliru) | 2: separuh benar | 1: hanya sedikit benar | 0: kosong atau salah',
     '#AKHIR',
     '```',
     '',
@@ -95,7 +96,7 @@ function promptMaster(){
     '1. Bagian A = pilihan ganda. Satu baris per nomor: "nomor spasi huruf" (huruf besar A/B/C/D saja).',
     '2. Jika sebuah soal PG ambigu, tidak punya jawaban benar, atau ada dua jawaban benar, tulis BONUS sebagai jawabannya (contoh: "7 BONUS").',
     '3. Bagian B = isian. Satu baris per nomor: "nomor | kunci" (kunci singkat, tanpa baris baru).',
-    '4. Bagian C = uraian/esai. Satu baris per nomor: "nomor | poin1 ; poin2 ; poin3" (poin-poin kunci dipisah tanda titik koma, tetap dalam satu baris).',
+    '4. Bagian C = uraian/esai. Satu baris per nomor, TETAP SATU BARIS, dengan format: "nomor | KUNCI: jawaban ideal | 4: ... | 3: ... | 2: ... | 1: ... | 0: ...". Nilai maksimal tiap soal = 4. Skor 4 = jawaban sempurna, 3 = kurang sedikit, 2 = separuh benar, 1 = sedikit benar, 0 = kosong/salah. Tulis kriteria SPESIFIK sesuai soal (poin apa yang harus ada untuk tiap skor), bukan kalimat umum. Gunakan tanda "|" hanya sebagai pemisah di format ini.',
     '5. Nomor mengikuti nomor soal di lembar soal. Jika suatu bagian tidak ada, tulis huruf bagiannya lalu satu baris "-".',
     '6. Jika ragu pada suatu jawaban PG, tetap pilih yang paling mungkin; jangan menulis tanda tanya.',
     '7. Jangan menambah judul, komentar, atau penjelasan apa pun di luar blok.'
@@ -247,7 +248,7 @@ function render(){
         [['-','–'],['A','A'],['B','B'],['C','C'],['D','D'],['*','Bonus']].map(function(o){return '<option value="'+o[0]+'"'+(c===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></label>';
     }
     h+='</div><div class="row"><div class="field"><label>Kunci Bagian B (satu baris per nomor: 1 | kunci)</label><textarea class="kk-ta" id="kkB" style="min-height:90px;">'+esc(kd.b)+'</textarea></div>'+
-       '<div class="field"><label>Kunci Bagian C</label><textarea class="kk-ta" id="kkC" style="min-height:90px;">'+esc(kd.c)+'</textarea></div></div>'+
+       '<div class="field"><label>Kunci Bagian C (1 | KUNCI: ... | 4: ... | 3: ... | 2: ... | 1: ... | 0: ...)</label><textarea class="kk-ta" id="kkC" style="min-height:90px;">'+esc(kd.c)+'</textarea></div></div>'+
        '<div class="btn-row"><button class="btn" id="kkSimpanBC">Simpan Kunci B &amp; C</button><button class="btn secondary" id="kkTutup">Tutup</button></div></div>';
   }
   h+='</div>';
@@ -296,7 +297,7 @@ function referensiBC(){
   var kd=getKunci(false), el=$('kkRef'); if(!el||!kd) return;
   var h='';
   if(kd.b) h+='<div class="card"><h3 style="margin:0 0 6px;">Kunci Bagian B (isian)</h3><div class="kk-kunci">'+esc(kd.b)+'</div></div>';
-  if(kd.c) h+='<div class="card"><h3 style="margin:0 0 6px;">Kunci Bagian C (uraian)</h3><div class="kk-kunci">'+esc(kd.c)+'</div></div>';
+  if(kd.c) h+='<div class="card"><h3 style="margin:0 0 6px;">Kunci &amp; Kriteria Bagian C (uraian, skor maks 4 per soal)</h3><div class="kk-kunci">'+esc(kd.c).replace(/ \| (?=(?:KUNCI|[0-4]):)/g,'\n    ')+'</div></div>';
   el.innerHTML=h;
 }
 function tabelHasil(){
