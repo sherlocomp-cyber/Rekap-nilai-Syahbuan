@@ -3,13 +3,14 @@
    scripts/polish.mjs, tepat sebelum </body>, setelah ui-polish.js).
    Alur: pilih Ujian + Mapel + Kelas -> pilih siswa -> tab Bagian A / B / C.
    Bagian A: ketik jawaban pilihan ganda (Q=A, W=B, E=C, R=D) atau tombol besar A/B/C/D.
-   Bagian B: kunci isian tampil per soal + tombol Benar/Salah. Bobot: 1 soal benar = 2 poin (BOBOT_B).
+   Bagian B: kunci isian tampil per soal; tiap soal bisa dapat 0, 1, atau 2 poin (BOBOT_B = poin maks per soal).
    Bagian C: kunci + kriteria skor 0-4 tampil per soal; ketuk kriteria yang cocok = skor.
-   Nilai A & C = skor / skor maksimal x maks nilai/bagian. Nilai B = benar x BOBOT_B (maks = maks nilai/bagian).
+   Nilai A & C = skor / skor maksimal x maks nilai/bagian. Nilai B = jumlah poin (maks = maks nilai/bagian).
    Nilai Akhir (tampil di atas kartu siswa bila A, B, C lengkap) memakai rumus fitur UTS/STS:
    total = A+B+C (tiap bagian dibulatkan seperti saat dikirim), akhir = round(total / (maks x 3) x 100).
    Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}}, waktu:{key:{siswaId:{d,t}}},
-                        skorB:{key:{siswaId:"10-1"}}, skorC:{key:{siswaId:"43-0"}} }
+                        skorB:{key:{siswaId:"2-10"}}  (poin per soal 0-2, '-' = belum),
+                        skorC:{key:{siswaId:"43-0"}}  (skor per soal 0-4, '-' = belum) }
    (nilai berupa string/angka agar aman digabung oleh mergeDeep_ saat sinkron)
    Kunci lama di fitur Ujian (DB.kunciJawaban) TIDAK dipakai.
    ========================================================================= */
@@ -18,7 +19,7 @@
 if(typeof DB === 'undefined' || typeof PAGES === 'undefined' || document.getElementById('page-koreksi')) return;
 
 var SEL_KEY = 'appRekapNilaiSekolah_v2_koreksiSel';
-var BOBOT_B = 2; /* poin per soal Bagian B yang benar */
+var BOBOT_B = 2; /* poin maksimal per soal Bagian B (pilihan 0, 1, 2) */
 var K = { ujian:'', mapel:'', kelas:'', siswaId:'', pos:0, panel:'', bag:'A' };
 
 /* ---------- util ---------- */
@@ -133,13 +134,13 @@ function setSkor(j,id,n,i,ch){
   st[key][id]=s.slice(0,i)+ch+s.slice(i+1);
 }
 /* ringkasan B/C satu siswa: {n, terisi, jml, nilai}
-   B: jml = jumlah soal benar, nilai = jml x BOBOT_B (maks = maks nilai/bagian)
+   B: jml = jumlah poin (tiap soal 0-2), nilai = jml (maks = maks nilai/bagian)
    C: jml = jumlah skor 0-4, nilai = jml / (n x 4) x maks nilai/bagian */
 function ringkasBC(j,kd,id){
   var items=(j==='B')?itemsB(kd):itemsC(kd), n=items.length, s=skorStr(j,id,n), jml=0, terisi=0;
   for(var i=0;i<n;i++){ var ch=s.charAt(i); if(ch!=='-'){ terisi++; jml+=parseInt(ch,10)||0; } }
   var nilai;
-  if(j==='B') nilai=Math.round(Math.min(maksBagian(), jml*BOBOT_B)*100)/100;
+  if(j==='B') nilai=Math.round(Math.min(maksBagian(), jml)*100)/100;
   else nilai = n ? Math.round(jml/(n*4)*maksBagian()*100)/100 : 0;
   return {n:n, terisi:terisi, jml:jml, nilai:nilai};
 }
@@ -272,10 +273,11 @@ css.textContent=[
 '#page-koreksi .kk-bc.sudah{border-color:var(--hijau);}',
 '#page-koreksi .kk-bc-kunci{font-size:15px;line-height:1.45;margin-bottom:8px;white-space:pre-wrap;}',
 '#page-koreksi .kk-bc-kunci b{color:var(--hijau-tua);}',
-'#page-koreksi .kk-bc-aksi{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+'#page-koreksi .kk-bc-aksi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}',
 '#page-koreksi .kk-sk{min-height:46px;border-radius:var(--r-md);border:2px solid var(--garis-strong);background:var(--kartu);color:var(--teks);font:inherit;font-weight:700;cursor:pointer;padding:6px 10px;touch-action:manipulation;}',
 '#page-koreksi .kk-sk.ok.on{background:var(--pill-hijau-bg);color:var(--pill-hijau-fg);border-color:var(--hijau);}',
 '#page-koreksi .kk-sk.no.on{background:var(--pill-merah-bg);color:var(--pill-merah-fg);border-color:var(--merah);}',
+'#page-koreksi .kk-sk.half.on{background:var(--hijau-muda);color:var(--hijau-tua);border-color:var(--biru);box-shadow:var(--ring);}',
 '#page-koreksi .kk-skala{display:flex;flex-direction:column;gap:6px;}',
 '#page-koreksi .kk-skala .kk-sk{display:flex;gap:10px;align-items:flex-start;text-align:left;font-weight:500;font-size:14px;line-height:1.35;}',
 '#page-koreksi .kk-skala .kk-sk b{font-size:20px;min-width:22px;line-height:1.1;}',
@@ -294,7 +296,7 @@ document.head.appendChild(css);
 var sec=document.createElement('section'); sec.className='page'; sec.id='page-koreksi';
 sec.innerHTML=
 '<div class="card"><h2>Koreksi Soal</h2>'+
-'<div class="sub">Pilih ujian, mapel, kelas, lalu siswa. <b>Bagian A</b> diketik cepat dengan keyboard <b>Q=A, W=B, E=C, R=D</b> atau tombol besar. <b>Bagian B</b> (1 soal = 2 poin) &amp; <b>C</b> dinilai di tab masing-masing, kunci tampil di tiap soal. Nilai akhir muncul di atas bila A, B, C sudah terisi semua.</div>'+
+'<div class="sub">Pilih ujian, mapel, kelas, lalu siswa. <b>Bagian A</b> diketik cepat dengan keyboard <b>Q=A, W=B, E=C, R=D</b> atau tombol besar. <b>Bagian B</b> (tiap soal 0, 1, atau 2 poin) &amp; <b>C</b> dinilai di tab masing-masing, kunci tampil di tiap soal. Nilai akhir muncul di atas bila A, B, C sudah terisi semua.</div>'+
 '<div class="row">'+
 '<div class="field"><label>Ujian</label><select id="kkUjian" class="sel-ujian"></select></div>'+
 '<div class="field"><label>Mata Pelajaran</label><select id="kkMapel"></select></div>'+
@@ -399,17 +401,20 @@ function bodyA(kd,s){
   if(kd.a.indexOf('-')>=0) h+='<div class="kk-warn">⚠ Ada soal yang kuncinya belum terisi (tanda –). Soal itu dianggap salah untuk semua siswa sampai kuncinya diisi.</div>';
   return h;
 }
-/* isi tab Bagian B: kunci isian per soal + Benar/Salah (benar = BOBOT_B poin) */
+/* isi tab Bagian B: kunci isian per soal; tiap soal 0 (salah), 1 (setengah), atau 2 (benar) poin */
 function bodyB(kd,s){
   var it=itemsB(kd);
   if(!it.length) return '<div class="empty-note">Kunci Bagian B belum ada. Isi lewat “Atur Kunci Manual” atau “Tempel Kunci dari AI”.</div>';
-  var str=skorStr('B',s.id,it.length), r=ringkasBC('B',kd,s.id), i;
-  var h='<div class="kk-info">Benar <span class="kk-skor">'+r.jml+' / '+it.length+'</span> · Poin <span class="kk-skor">'+(r.jml*BOBOT_B)+' / '+(it.length*BOBOT_B)+'</span> (1 soal = '+BOBOT_B+' poin) · Nilai B: <span class="kk-skor">'+(r.terisi?r.nilai:'–')+'</span> (maks '+maksBagian()+') · terisi '+r.terisi+'/'+it.length+'</div>';
+  var str=skorStr('B',s.id,it.length), r=ringkasBC('B',kd,s.id);
+  var h='<div class="kk-info">Poin <span class="kk-skor">'+r.jml+' / '+(it.length*BOBOT_B)+'</span> (tiap soal 0, 1, atau '+BOBOT_B+') · Nilai B: <span class="kk-skor">'+(r.terisi?r.nilai:'–')+'</span> (maks '+maksBagian()+') · terisi '+r.terisi+'/'+it.length+'</div>';
   it.forEach(function(x,idx){
     var ch=str.charAt(idx);
     h+='<div class="kk-bc'+(ch!=='-'?' sudah':'')+'"><div class="kk-bc-kunci"><b>'+esc(x.no)+'.</b> '+esc(x.teks)+'</div>'+
-       '<div class="kk-bc-aksi"><button class="kk-sk ok'+(ch==='1'?' on':'')+'" data-kk-b="'+idx+':1">✓ Benar (+'+BOBOT_B+')</button>'+
-       '<button class="kk-sk no'+(ch==='0'?' on':'')+'" data-kk-b="'+idx+':0">✗ Salah</button></div></div>';
+       '<div class="kk-bc-aksi">'+
+       '<button class="kk-sk no'+(ch==='0'?' on':'')+'" data-kk-b="'+idx+':0">✗ Salah<br>0</button>'+
+       '<button class="kk-sk half'+(ch==='1'?' on':'')+'" data-kk-b="'+idx+':1">½ Sebagian<br>1</button>'+
+       '<button class="kk-sk ok'+(ch==='2'?' on':'')+'" data-kk-b="'+idx+':2">✓ Benar<br>2</button>'+
+       '</div></div>';
   });
   return h;
 }
