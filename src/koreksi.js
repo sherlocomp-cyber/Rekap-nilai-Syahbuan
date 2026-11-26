@@ -8,6 +8,7 @@
    Nilai A & C = skor / skor maksimal x maks nilai/bagian. Nilai B = jumlah poin (maks = maks nilai/bagian).
    Nilai Akhir (tampil di atas kartu siswa bila A, B, C lengkap) memakai rumus fitur UTS/STS:
    total = A+B+C (tiap bagian dibulatkan seperti saat dikirim), akhir = round(total / (maks x 3) x 100).
+   Kotak "Belum dinilai" di atas daftar siswa: jumlah siswa yang belum selesai per bagian A / B / C.
    Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}}, waktu:{key:{siswaId:{d,t}}},
                         skorB:{key:{siswaId:"2-10"}}  (poin per soal 0-2, '-' = belum),
                         skorC:{key:{siswaId:"43-0"}}  (skor per soal 0-4, '-' = belum) }
@@ -153,6 +154,32 @@ function nilaiAkhirSiswa(kd,id){
   var maks3=maksBagian()*3, total=a+b+c;
   return {a:a, b:b, c:c, total:total, maks3:maks3, akhir:Math.round((total/maks3)*100)};
 }
+/* Berapa siswa yang BELUM selesai dinilai di tiap bagian.
+   belum = soal belum terisi semua; sebagian = di antaranya yang sudah mulai terisi.
+   ada=false bila kunci bagian itu belum dibuat. */
+function hitungBelum(kd){
+  var list=siswaList(), nB=itemsB(kd).length, nC=itemsC(kd).length;
+  var h={total:list.length, A:{ada:true,belum:0,sebagian:0}, B:{ada:nB>0,belum:0,sebagian:0}, C:{ada:nC>0,belum:0,sebagian:0}};
+  function catat(o,terisi,n){ if(terisi<n){ o.belum++; if(terisi>0) o.sebagian++; } }
+  list.forEach(function(s){
+    catat(h.A, hitung(kd,jawabSiswa(s.id,kd.n)).terisi, kd.n);
+    if(h.B.ada) catat(h.B, ringkasBC('B',kd,s.id).terisi, nB);
+    if(h.C.ada) catat(h.C, ringkasBC('C',kd,s.id).terisi, nC);
+  });
+  return h;
+}
+function updateBelum(){
+  var el=$('kkBelum'), kd=getKunci(false); if(!el||!kd) return;
+  var h=hitungBelum(kd);
+  function baris(huruf,o){
+    var isi;
+    if(!o.ada) isi='<span>kunci belum ada</span>';
+    else if(!o.belum) isi='<span class="ok">✓ semua selesai</span>';
+    else isi='<span><b>'+o.belum+'</b> belum'+(o.sebagian?' <small>('+o.sebagian+' baru sebagian)</small>':'')+'</span>';
+    return '<div><span>Bagian '+huruf+'</span>'+isi+'</div>';
+  }
+  el.innerHTML='<div class="kk-belum-judul">Belum dinilai (dari '+h.total+' siswa)</div>'+baris('A',h.A)+baris('B',h.B)+baris('C',h.C);
+}
 
 /* ---------- Prompt master + parser ---------- */
 function promptMaster(){
@@ -264,6 +291,13 @@ css.textContent=[
 '#page-koreksi .kk-edit select{width:auto;min-width:66px;}',
 '#page-koreksi .kk-warn{color:var(--warn-text);font-size:13px;margin-top:6px;}',
 '#page-koreksi .kk-hasil td,#page-koreksi .kk-hasil th{padding:6px 8px;text-align:left;border-bottom:1px solid var(--garis);}',
+/* kotak "Belum dinilai" per bagian */
+'#page-koreksi .kk-belum{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;padding:8px 10px;border:1px solid var(--garis);border-radius:var(--r-md);background:var(--surface-2);font-size:13px;}',
+'#page-koreksi .kk-belum-judul{font-weight:700;color:var(--abu);font-size:12px;}',
+'#page-koreksi .kk-belum>div:not(.kk-belum-judul){display:flex;justify-content:space-between;gap:8px;align-items:baseline;}',
+'#page-koreksi .kk-belum b{font-size:16px;color:var(--teks);}',
+'#page-koreksi .kk-belum small{color:var(--abu);}',
+'#page-koreksi .kk-belum .ok{color:var(--ok-text);font-weight:700;}',
 /* tab Bagian A/B/C + kartu butir B & C */
 '#page-koreksi .kk-tabs{display:flex;gap:6px;margin:6px 0 12px;}',
 '#page-koreksi .kk-tab{flex:1 1 0;min-height:48px;padding:6px 8px;border-radius:var(--r-md);border:1px solid var(--garis-strong);background:var(--surface-2);color:var(--teks);font:inherit;font-weight:800;font-size:16px;cursor:pointer;touch-action:manipulation;}',
@@ -363,7 +397,7 @@ function render(){
   }
   h+='</div>';
   if(kd){
-    h+='<div class="kk-grid"><div class="card"><h3 style="margin:0 0 8px;">Siswa</h3><div class="kk-siswa" id="kkSiswa"></div></div><div id="kkPanel"></div></div>';
+    h+='<div class="kk-grid"><div class="card"><h3 style="margin:0 0 8px;">Siswa</h3><div class="kk-belum" id="kkBelum"></div><div class="kk-siswa" id="kkSiswa"></div></div><div id="kkPanel"></div></div>';
     h+='<div id="kkHasil"></div>';
   }
   box.innerHTML=h;
@@ -375,6 +409,7 @@ function daftarSiswa(){
     var r=hitung(kd,jawabSiswa(s.id,kd.n)), done=r.terisi>=kd.n;
     return '<button class="kk-sw'+(s.id===K.siswaId?' aktif':'')+(done?' done':'')+'" data-kk-siswa="'+esc(s.id)+'"><span>'+(i+1)+'. '+esc(s.nama)+'</span><small>'+(r.terisi?(done?('✓ '+r.benar+'/'+kd.n):(r.terisi+'/'+kd.n)):'belum')+'</small></button>';
   }).join('');
+  updateBelum();
 }
 function siswaAktif(){ return siswaList().find(function(s){return s.id===K.siswaId;}); }
 
@@ -521,7 +556,7 @@ function beriSkor(j,idxSkor){
   var n=(j==='B'?itemsB(kd):itemsC(kd)).length; if(!(i>=0&&i<n)) return;
   var lama=skorStr(j,s.id,n).charAt(i);
   setSkor(j,s.id,n,i,lama===v?'-':v);
-  simpan(); panelKoreksi(); tabelHasil();
+  simpan(); panelKoreksi(); tabelHasil(); updateBelum();
 }
 function kirimKeUts(){
   var kd=getKunci(false); if(!kd) return;
