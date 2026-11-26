@@ -1,11 +1,13 @@
 /* =========================================================================
    KOREKSI SOAL — modul tambahan (disisipkan otomatis saat build oleh
    scripts/polish.mjs, tepat sebelum </body>, setelah ui-polish.js).
-   Alur: pilih Ujian + Mapel + Kelas -> pilih siswa -> ketik jawaban
-   pilihan ganda (Q=A, W=B, E=C, R=D) atau tekan tombol besar A/B/C/D.
-   Bagian B & C: hanya menampilkan kunci (dikoreksi manual).
-   Bagian C: kunci + kriteria skor 0-4 per soal (dari prompt master).
-   Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}}, waktu:{key:{siswaId:{d,t}}} }
+   Alur: pilih Ujian + Mapel + Kelas -> pilih siswa -> tab Bagian A / B / C.
+   Bagian A: ketik jawaban pilihan ganda (Q=A, W=B, E=C, R=D) atau tombol besar A/B/C/D.
+   Bagian B: kunci isian tampil per soal + tombol Benar/Salah.
+   Bagian C: kunci + kriteria skor 0-4 tampil per soal; ketuk kriteria yang cocok = skor.
+   Nilai tiap bagian = jumlah skor / skor maksimal x maks nilai/bagian (dibulatkan saat dikirim ke UTS/STS).
+   Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}}, waktu:{key:{siswaId:{d,t}}},
+                        skorB:{key:{siswaId:"10-1"}}, skorC:{key:{siswaId:"43-0"}} }
    (nilai berupa string/angka agar aman digabung oleh mergeDeep_ saat sinkron)
    Kunci lama di fitur Ujian (DB.kunciJawaban) TIDAK dipakai.
    ========================================================================= */
@@ -14,7 +16,7 @@
 if(typeof DB === 'undefined' || typeof PAGES === 'undefined' || document.getElementById('page-koreksi')) return;
 
 var SEL_KEY = 'appRekapNilaiSekolah_v2_koreksiSel';
-var K = { ujian:'', mapel:'', kelas:'', siswaId:'', pos:0, panel:'' };
+var K = { ujian:'', mapel:'', kelas:'', siswaId:'', pos:0, panel:'', bag:'A' };
 
 /* ---------- util ---------- */
 function esc(s){ return (typeof escapeHtml==='function') ? escapeHtml(s) : String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -26,6 +28,8 @@ function ensure(){
   if(!DB.koreksi.kunci || typeof DB.koreksi.kunci!=='object') DB.koreksi.kunci = {};
   if(!DB.koreksi.jawab || typeof DB.koreksi.jawab!=='object') DB.koreksi.jawab = {};
   if(!DB.koreksi.waktu || typeof DB.koreksi.waktu!=='object') DB.koreksi.waktu = {};
+  if(!DB.koreksi.skorB || typeof DB.koreksi.skorB!=='object') DB.koreksi.skorB = {};
+  if(!DB.koreksi.skorC || typeof DB.koreksi.skorC!=='object') DB.koreksi.skorC = {};
   return DB.koreksi;
 }
 function kelasObj(){ return DB.kelasList.find(function(k){return k.id===K.kelas;}); }
@@ -92,6 +96,46 @@ function maksBagian(){
   try{ var d=getUtsData(K.mapel,K.kelas); return d && d.maksBagian ? d.maksBagian : 20; }catch(e){ return 20; }
 }
 function nilaiA(benar,n){ return Math.round((benar/n)*maksBagian()*100)/100; }
+
+/* ---------- Bagian B & C: butir kunci + skor per soal ---------- */
+function itemsB(kd){
+  return String(kd.b||'').split('\n').map(function(l){
+    var m=l.trim().match(/^(\d{1,3})\s*[.)|:\-]?\s*\|?\s*(.*)$/);
+    return m ? {no:m[1], teks:m[2]} : null;
+  }).filter(Boolean);
+}
+function itemsC(kd){
+  return String(kd.c||'').split('\n').map(function(l){
+    var m=l.trim().match(/^(\d{1,3})\s*[.)|:]?\s*(.*)$/); if(!m) return null;
+    var kunci='', kr={};
+    m[2].split(/\s*\|\s*/).forEach(function(p){
+      var k=p.match(/^KUNCI\s*:\s*(.*)$/i);
+      if(k){ kunci=k[1]; return; }
+      var s=p.match(/^([0-4])\s*:\s*(.*)$/);
+      if(s){ kr[s[1]]=s[2]; return; }
+      if(!kunci) kunci=p;
+    });
+    return {no:m[1], kunci:kunci, kr:kr};
+  }).filter(Boolean);
+}
+function skorStr(j,id,n){
+  var st=ensure()['skor'+j], key=kJawab();
+  if(!st[key]) st[key]={};
+  return pad(st[key][id],n,'-');
+}
+function setSkor(j,id,n,i,ch){
+  var st=ensure()['skor'+j], key=kJawab();
+  if(!st[key]) st[key]={};
+  var s=pad(st[key][id],n,'-');
+  st[key][id]=s.slice(0,i)+ch+s.slice(i+1);
+}
+/* ringkasan B/C satu siswa: {n, terisi, jml, nilai} */
+function ringkasBC(j,kd,id){
+  var items=(j==='B')?itemsB(kd):itemsC(kd), n=items.length, s=skorStr(j,id,n), jml=0, terisi=0;
+  for(var i=0;i<n;i++){ var ch=s.charAt(i); if(ch!=='-'){ terisi++; jml+=parseInt(ch,10)||0; } }
+  var maksTotal=(j==='B')?n:n*4;
+  return {n:n, terisi:terisi, jml:jml, nilai: maksTotal ? Math.round(jml/maksTotal*maksBagian()*100)/100 : 0};
+}
 
 /* ---------- Prompt master + parser ---------- */
 function promptMaster(){
@@ -202,7 +246,25 @@ css.textContent=[
 '#page-koreksi .kk-edit label{display:flex;align-items:center;gap:6px;font-size:14px;}',
 '#page-koreksi .kk-edit select{width:auto;min-width:66px;}',
 '#page-koreksi .kk-warn{color:var(--warn-text);font-size:13px;margin-top:6px;}',
-'#page-koreksi .kk-hasil td,#page-koreksi .kk-hasil th{padding:6px 8px;text-align:left;border-bottom:1px solid var(--garis);}'
+'#page-koreksi .kk-hasil td,#page-koreksi .kk-hasil th{padding:6px 8px;text-align:left;border-bottom:1px solid var(--garis);}',
+/* tab Bagian A/B/C + kartu butir B & C */
+'#page-koreksi .kk-tabs{display:flex;gap:6px;margin:6px 0 12px;}',
+'#page-koreksi .kk-tab{flex:1 1 0;min-height:48px;padding:6px 8px;border-radius:var(--r-md);border:1px solid var(--garis-strong);background:var(--surface-2);color:var(--teks);font:inherit;font-weight:800;font-size:16px;cursor:pointer;touch-action:manipulation;}',
+'#page-koreksi .kk-tab small{display:block;font-size:12px;font-weight:600;color:var(--abu);}',
+'#page-koreksi .kk-tab.aktif{border-color:var(--hijau);background:var(--hijau-muda);color:var(--hijau-tua);box-shadow:var(--ring);}',
+'#page-koreksi .kk-bc{border:1px solid var(--garis);border-radius:var(--r-md);padding:10px;margin-bottom:10px;background:var(--surface-2);}',
+'#page-koreksi .kk-bc.sudah{border-color:var(--hijau);}',
+'#page-koreksi .kk-bc-kunci{font-size:15px;line-height:1.45;margin-bottom:8px;white-space:pre-wrap;}',
+'#page-koreksi .kk-bc-kunci b{color:var(--hijau-tua);}',
+'#page-koreksi .kk-bc-aksi{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+'#page-koreksi .kk-sk{min-height:46px;border-radius:var(--r-md);border:2px solid var(--garis-strong);background:var(--kartu);color:var(--teks);font:inherit;font-weight:700;cursor:pointer;padding:6px 10px;touch-action:manipulation;}',
+'#page-koreksi .kk-sk.ok.on{background:var(--pill-hijau-bg);color:var(--pill-hijau-fg);border-color:var(--hijau);}',
+'#page-koreksi .kk-sk.no.on{background:var(--pill-merah-bg);color:var(--pill-merah-fg);border-color:var(--merah);}',
+'#page-koreksi .kk-skala{display:flex;flex-direction:column;gap:6px;}',
+'#page-koreksi .kk-skala .kk-sk{display:flex;gap:10px;align-items:flex-start;text-align:left;font-weight:500;font-size:14px;line-height:1.35;}',
+'#page-koreksi .kk-skala .kk-sk b{font-size:20px;min-width:22px;line-height:1.1;}',
+'#page-koreksi .kk-skala .kk-sk.on{background:var(--hijau-muda);border-color:var(--hijau);color:var(--hijau-tua);}',
+'#page-koreksi .kk-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}'
 ].join('\n');
 document.head.appendChild(css);
 
@@ -210,7 +272,7 @@ document.head.appendChild(css);
 var sec=document.createElement('section'); sec.className='page'; sec.id='page-koreksi';
 sec.innerHTML=
 '<div class="card"><h2>Koreksi Soal</h2>'+
-'<div class="sub">Pilih ujian, mapel, kelas, lalu siswa. Bagian A diketik cepat dengan keyboard <b>Q=A, W=B, E=C, R=D</b> atau tombol besar. Bagian B &amp; C hanya menampilkan kunci.</div>'+
+'<div class="sub">Pilih ujian, mapel, kelas, lalu siswa. <b>Bagian A</b> diketik cepat dengan keyboard <b>Q=A, W=B, E=C, R=D</b> atau tombol besar. <b>Bagian B &amp; C</b> dinilai di tab masing-masing, kunci tampil di tiap soal.</div>'+
 '<div class="row">'+
 '<div class="field"><label>Ujian</label><select id="kkUjian" class="sel-ujian"></select></div>'+
 '<div class="field"><label>Mata Pelajaran</label><select id="kkMapel"></select></div>'+
@@ -255,7 +317,7 @@ function render(){
   if(!K.mapel||!K.kelas||!K.ujian){ box.innerHTML='<div class="card"><div class="empty-note">Tambahkan mapel dan kelas di Pengaturan dulu.</div></div>'; return; }
   var kd=getKunci(false), h='';
   h+='<div class="card"><h3 style="margin:0 0 6px;">Kunci Jawaban</h3>';
-  h+='<div class="kk-info">'+(kd?('Bagian A: <b>'+kd.n+' soal</b>'+(kd.b?' · B: '+kd.b.split('\n').length:'')+(kd.c?' · C: '+kd.c.split('\n').length:'')):'Belum ada kunci untuk ujian/mapel/tingkat ini.')+'</div>';
+  h+='<div class="kk-info">'+(kd?('Bagian A: <b>'+kd.n+' soal</b>'+(kd.b?' · B: '+itemsB(kd).length:'')+(kd.c?' · C: '+itemsC(kd).length:'')):'Belum ada kunci untuk ujian/mapel/tingkat ini.')+'</div>';
   h+='<div class="btn-row"><button class="btn" id="kkSalinPrompt">📋 Salin Prompt Master</button>'+
      '<button class="btn secondary" id="kkTempel">Tempel Kunci dari AI</button>'+
      '<button class="btn secondary" id="kkAtur">Atur Kunci Manual</button></div>';
@@ -278,10 +340,10 @@ function render(){
   h+='</div>';
   if(kd){
     h+='<div class="kk-grid"><div class="card"><h3 style="margin:0 0 8px;">Siswa</h3><div class="kk-siswa" id="kkSiswa"></div></div><div id="kkPanel"></div></div>';
-    h+='<div id="kkRef"></div><div id="kkHasil"></div>';
+    h+='<div id="kkHasil"></div>';
   }
   box.innerHTML=h;
-  if(kd){ daftarSiswa(); panelKoreksi(); referensiBC(); tabelHasil(); }
+  if(kd){ daftarSiswa(); panelKoreksi(); tabelHasil(); }
 }
 function daftarSiswa(){
   var kd=getKunci(false), el=$('kkSiswa'); if(!el||!kd) return;
@@ -291,10 +353,9 @@ function daftarSiswa(){
   }).join('');
 }
 function siswaAktif(){ return siswaList().find(function(s){return s.id===K.siswaId;}); }
-function panelKoreksi(){
-  var kd=getKunci(false), el=$('kkPanel'); if(!el||!kd) return;
-  var s=siswaAktif();
-  if(!s){ el.innerHTML='<div class="card"><div class="empty-note">Pilih siswa di sebelah kiri untuk mulai mengoreksi.</div></div>'; return; }
+
+/* isi tab Bagian A (kode lama, tidak berubah perilakunya) */
+function bodyA(kd,s){
   var jw=jawabSiswa(s.id,kd.n), r=hitung(kd,jw), selesai=K.pos>=kd.n;
   var strip='';
   for(var i=0;i<kd.n;i++){
@@ -303,8 +364,7 @@ function panelKoreksi(){
     if(i===K.pos) cls+=' cur';
     strip+='<button class="'+cls+'" data-kk-pos="'+i+'" title="Soal '+(i+1)+'">'+(i+1)+(j!=='-'?j:'')+'</button>';
   }
-  var h='<div class="card"><p class="kk-nama">'+esc(s.nama)+'</p>'+
-    '<div class="kk-info">Benar <span class="kk-skor">'+r.benar+' / '+kd.n+'</span> · Nilai A: <span class="kk-skor">'+nilaiA(r.benar,kd.n)+'</span> (maks '+maksBagian()+')'+
+  var h='<div class="kk-info">Benar <span class="kk-skor">'+r.benar+' / '+kd.n+'</span> · Nilai A: <span class="kk-skor">'+nilaiA(r.benar,kd.n)+'</span> (maks '+maksBagian()+')'+
     ' · ⏱ <span class="kk-skor" id="kkTimer">'+(detikWaktu(s.id,r.terisi>=kd.n)==null?'mulai saat soal 1 diisi':fmtWaktu(detikWaktu(s.id,r.terisi>=kd.n)))+'</span></div>';
   if(selesai){
     h+='<div class="kk-no" style="font-size:34px;">Selesai ✓</div><div class="btn-row"><button class="btn" id="kkNext">Siswa berikutnya (Enter)</button><button class="btn secondary" id="kkUlang">Ulangi dari soal 1</button></div>';
@@ -315,14 +375,56 @@ function panelKoreksi(){
   }
   h+='<div class="kk-strip">'+strip+'</div><div class="kk-info">Keyboard: Q W E R = A B C D · Spasi = kosong · Backspace = mundur · ← → pindah soal · Enter = siswa berikutnya</div>';
   if(kd.a.indexOf('-')>=0) h+='<div class="kk-warn">⚠ Ada soal yang kuncinya belum terisi (tanda –). Soal itu dianggap salah untuk semua siswa sampai kuncinya diisi.</div>';
-  h+='</div>';
-  el.innerHTML=h;
+  return h;
 }
-function referensiBC(){
-  var kd=getKunci(false), el=$('kkRef'); if(!el||!kd) return;
-  var h='';
-  if(kd.b) h+='<div class="card"><h3 style="margin:0 0 6px;">Kunci Bagian B (isian)</h3><div class="kk-kunci">'+esc(kd.b)+'</div></div>';
-  if(kd.c) h+='<div class="card"><h3 style="margin:0 0 6px;">Kunci &amp; Kriteria Bagian C (uraian, skor maks 4 per soal)</h3><div class="kk-kunci">'+esc(kd.c).replace(/ \| (?=(?:KUNCI|[0-4]):)/g,'\n    ')+'</div></div>';
+/* isi tab Bagian B: kunci isian per soal + Benar/Salah */
+function bodyB(kd,s){
+  var it=itemsB(kd);
+  if(!it.length) return '<div class="empty-note">Kunci Bagian B belum ada. Isi lewat “Atur Kunci Manual” atau “Tempel Kunci dari AI”.</div>';
+  var str=skorStr('B',s.id,it.length), r=ringkasBC('B',kd,s.id), benar=0, i;
+  for(i=0;i<it.length;i++) if(str.charAt(i)==='1') benar++;
+  var h='<div class="kk-info">Benar <span class="kk-skor">'+benar+' / '+it.length+'</span> · Nilai B: <span class="kk-skor">'+(r.terisi?r.nilai:'–')+'</span> (maks '+maksBagian()+') · terisi '+r.terisi+'/'+it.length+'</div>';
+  it.forEach(function(x,idx){
+    var ch=str.charAt(idx);
+    h+='<div class="kk-bc'+(ch!=='-'?' sudah':'')+'"><div class="kk-bc-kunci"><b>'+esc(x.no)+'.</b> '+esc(x.teks)+'</div>'+
+       '<div class="kk-bc-aksi"><button class="kk-sk ok'+(ch==='1'?' on':'')+'" data-kk-b="'+idx+':1">✓ Benar</button>'+
+       '<button class="kk-sk no'+(ch==='0'?' on':'')+'" data-kk-b="'+idx+':0">✗ Salah</button></div></div>';
+  });
+  return h;
+}
+/* isi tab Bagian C: kunci + kriteria skor 0-4, ketuk kriteria = beri skor */
+function bodyC(kd,s){
+  var it=itemsC(kd);
+  if(!it.length) return '<div class="empty-note">Kunci Bagian C belum ada. Isi lewat “Atur Kunci Manual” atau “Tempel Kunci dari AI”.</div>';
+  var str=skorStr('C',s.id,it.length), r=ringkasBC('C',kd,s.id);
+  var h='<div class="kk-info">Skor <span class="kk-skor">'+r.jml+' / '+(it.length*4)+'</span> · Nilai C: <span class="kk-skor">'+(r.terisi?r.nilai:'–')+'</span> (maks '+maksBagian()+') · terisi '+r.terisi+'/'+it.length+'</div>';
+  it.forEach(function(x,idx){
+    var ch=str.charAt(idx);
+    h+='<div class="kk-bc'+(ch!=='-'?' sudah':'')+'"><div class="kk-bc-kunci"><b>'+esc(x.no)+'.</b> '+esc(x.kunci||'(kunci belum diisi)')+'</div><div class="kk-skala">';
+    [4,3,2,1,0].forEach(function(sc){
+      h+='<button class="kk-sk'+(ch===String(sc)?' on':'')+'" data-kk-c="'+idx+':'+sc+'"><b>'+sc+'</b><span>'+esc(x.kr[sc]||'')+'</span></button>';
+    });
+    h+='</div></div>';
+  });
+  return h;
+}
+function panelKoreksi(){
+  var kd=getKunci(false), el=$('kkPanel'); if(!el||!kd) return;
+  var s=siswaAktif();
+  if(!s){ el.innerHTML='<div class="card"><div class="empty-note">Pilih siswa di sebelah kiri untuk mulai mengoreksi.</div></div>'; return; }
+  var rA=hitung(kd,jawabSiswa(s.id,kd.n)), rB=ringkasBC('B',kd,s.id), rC=ringkasBC('C',kd,s.id);
+  function tab(kode,judul,info){ return '<button class="kk-tab'+(K.bag===kode?' aktif':'')+'" data-kk-bag="'+kode+'">'+judul+'<small>'+info+'</small></button>'; }
+  var h='<div class="card"><p class="kk-nama">'+esc(s.nama)+'</p>'+
+    '<div class="kk-tabs">'+
+      tab('A','Bagian A',rA.terisi+'/'+kd.n)+
+      tab('B','Bagian B',rB.n?(rB.terisi+'/'+rB.n):'–')+
+      tab('C','Bagian C',rC.n?(rC.terisi+'/'+rC.n):'–')+
+    '</div>';
+  h+=(K.bag==='B')?bodyB(kd,s):(K.bag==='C')?bodyC(kd,s):bodyA(kd,s);
+  if(K.bag!=='A'){
+    h+='<div class="kk-nav"><button class="btn secondary" data-kk-nav="-1">← Siswa sebelumnya</button><button class="btn" data-kk-nav="1">Siswa berikutnya →</button></div>';
+  }
+  h+='</div>';
   el.innerHTML=h;
 }
 function tabelHasil(){
@@ -330,13 +432,14 @@ function tabelHasil(){
   var total=0, jml=0;
   var rows=siswaList().map(function(s,i){
     var r=hitung(kd,jawabSiswa(s.id,kd.n)), done=r.terisi>=kd.n, dt=detikWaktu(s.id,done);
+    var rb=ringkasBC('B',kd,s.id), rc=ringkasBC('C',kd,s.id);
     if(done && dt!=null){ total+=dt; jml++; }
-    return '<tr><td>'+(i+1)+'</td><td>'+esc(s.nama)+'</td><td>'+(r.terisi?r.benar+' / '+kd.n:'–')+'</td><td>'+(r.terisi?nilaiA(r.benar,kd.n):'–')+'</td><td>'+(dt==null?'–':fmtWaktu(dt)+(done?'':' …'))+'</td></tr>';
+    return '<tr><td>'+(i+1)+'</td><td>'+esc(s.nama)+'</td><td>'+(r.terisi?r.benar+' / '+kd.n:'–')+'</td><td>'+(r.terisi?nilaiA(r.benar,kd.n):'–')+'</td><td>'+(rb.terisi?rb.nilai:'–')+'</td><td>'+(rc.terisi?rc.nilai:'–')+'</td><td>'+(dt==null?'–':fmtWaktu(dt)+(done?'':' …'))+'</td></tr>';
   }).join('');
   var ringkas=jml?('<div class="kk-info">Waktu koreksi Bagian A: total <b>'+fmtWaktu(total)+'</b> untuk '+jml+' siswa · rata-rata <b>'+fmtWaktu(total/jml)+'</b> per siswa (jeda lebih dari '+IDLE_MAX+' dtk dihitung '+IDLE_MAX+' dtk).</div>'):'';
-  el.innerHTML='<div class="card kk-hasil"><h3 style="margin:0 0 6px;">Hasil Bagian A</h3><div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Benar</th><th>Nilai A</th><th>Waktu</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+ringkas+
-    '<div class="btn-row" style="margin-top:10px;"><button class="btn" id="kkKirim">Terapkan Nilai A ke menu Nilai UTS/STS</button></div>'+
-    '<div class="kk-info">Hanya siswa yang sudah ada jawabannya yang dikirim. Nilai B &amp; C tetap Anda isi sendiri di menu UTS/STS.</div></div>';
+  el.innerHTML='<div class="card kk-hasil"><h3 style="margin:0 0 6px;">Hasil Koreksi</h3><div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Benar A</th><th>Nilai A</th><th>Nilai B</th><th>Nilai C</th><th>Waktu A</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+ringkas+
+    '<div class="btn-row" style="margin-top:10px;"><button class="btn" id="kkKirim">Terapkan Nilai A, B &amp; C ke menu Nilai UTS/STS</button></div>'+
+    '<div class="kk-info">Hanya bagian yang sudah ada isinya yang dikirim. Nilai dibulatkan ke bilangan bulat karena pilihan di tabel UTS/STS berupa angka bulat.</div></div>';
 }
 function segarkan(){ daftarSiswa(); panelKoreksi(); tabelHasil(); }
 
@@ -370,20 +473,44 @@ function berikutnya(){
   }
   toast('Semua siswa sudah selesai dikoreksi.');
 }
+/* pindah siswa urut daftar (dipakai tab B & C) */
+function sebelah(arah){
+  var list=siswaList(); if(!list.length) return;
+  var idx=list.findIndex(function(s){return s.id===K.siswaId;}), n=list.length;
+  pilihSiswa(list[(idx<0?0:(idx+arah+n)%n)].id);
+  try{ $('kkPanel').scrollIntoView({block:'start'}); }catch(e){}
+}
+/* beri skor B/C: ketuk lagi pada pilihan yang sama = hapus */
+function beriSkor(j,idxSkor){
+  var kd=getKunci(false), s=siswaAktif(); if(!kd||!s) return;
+  var p=idxSkor.split(':'), i=parseInt(p[0],10), v=p[1];
+  var n=(j==='B'?itemsB(kd):itemsC(kd)).length; if(!(i>=0&&i<n)) return;
+  var lama=skorStr(j,s.id,n).charAt(i);
+  setSkor(j,s.id,n,i,lama===v?'-':v);
+  simpan(); panelKoreksi(); tabelHasil();
+}
 function kirimKeUts(){
   var kd=getKunci(false); if(!kd) return;
   var d; try{ d=getUtsData(K.mapel,K.kelas); }catch(e){ return alertDialog('Data UTS/STS belum bisa dibuka.'); }
   var daftar=[];
   siswaList().forEach(function(s){
-    var r=hitung(kd,jawabSiswa(s.id,kd.n)); if(!r.terisi) return;
+    var r=hitung(kd,jawabSiswa(s.id,kd.n)), rb=ringkasBC('B',kd,s.id), rc=ringkasBC('C',kd,s.id);
+    if(!r.terisi && !rb.terisi && !rc.terisi) return;
     var row=d.siswa.find(function(x){return x.id && x.id===s.id;}) || d.siswa.find(function(x){return x.nama===s.nama;});
-    if(row) daftar.push({row:row, v:nilaiA(r.benar,kd.n)});
+    if(row) daftar.push({row:row,
+      a: r.terisi ? Math.round(nilaiA(r.benar,kd.n)) : null,
+      b: rb.terisi ? Math.round(rb.nilai) : null,
+      c: rc.terisi ? Math.round(rc.nilai) : null});
   });
-  if(!daftar.length) return alertDialog('Belum ada jawaban siswa yang bisa dikirim.');
-  confirmDialog('Isi nilai A untuk '+daftar.length+' siswa pada ujian "'+namaUjian()+'" ('+K.mapel+', kelas '+(kelasObj()||{}).nama+')? Nilai A yang sudah ada akan diganti.',{confirmLabel:'Terapkan'}).then(function(ya){
+  if(!daftar.length) return alertDialog('Belum ada nilai siswa yang bisa dikirim.');
+  confirmDialog('Isi nilai A/B/C untuk '+daftar.length+' siswa pada ujian "'+namaUjian()+'" ('+K.mapel+', kelas '+(kelasObj()||{}).nama+')? Nilai yang sudah ada pada bagian yang terisi akan diganti.',{confirmLabel:'Terapkan'}).then(function(ya){
     if(!ya) return;
-    daftar.forEach(function(x){ x.row.a=x.v; });
-    simpan(); toast('Nilai A terkirim ke menu Nilai UTS/STS ('+daftar.length+' siswa).');
+    daftar.forEach(function(x){
+      if(x.a!=null) x.row.a=x.a;
+      if(x.b!=null) x.row.b=x.b;
+      if(x.c!=null) x.row.c=x.c;
+    });
+    simpan(); toast('Nilai A/B/C terkirim ke menu Nilai UTS/STS ('+daftar.length+' siswa).');
   });
 }
 
@@ -441,6 +568,10 @@ sec.addEventListener('click',function(e){
   if(b.hasAttribute('data-kk-siswa')){ pilihSiswa(b.getAttribute('data-kk-siswa')); return; }
   if(b.hasAttribute('data-kk-j')){ jawab(b.getAttribute('data-kk-j')); return; }
   if(b.hasAttribute('data-kk-pos')){ K.pos=+b.getAttribute('data-kk-pos'); panelKoreksi(); return; }
+  if(b.hasAttribute('data-kk-bag')){ K.bag=b.getAttribute('data-kk-bag'); panelKoreksi(); return; }
+  if(b.hasAttribute('data-kk-b')){ beriSkor('B',b.getAttribute('data-kk-b')); return; }
+  if(b.hasAttribute('data-kk-c')){ beriSkor('C',b.getAttribute('data-kk-c')); return; }
+  if(b.hasAttribute('data-kk-nav')){ sebelah(parseInt(b.getAttribute('data-kk-nav'),10)||1); return; }
 });
 document.addEventListener('keydown',function(e){
   if(!sec.classList.contains('active')||e.ctrlKey||e.metaKey||e.altKey||e.isComposing) return;
@@ -449,6 +580,8 @@ document.addEventListener('keydown',function(e){
   if(document.querySelector('#modalOverlay.show')) return;
   var kd=getKunci(false); if(!kd||!siswaAktif()) return;
   var k=e.key, m={q:'A',w:'B',e:'C',r:'D'}, lk=k.length===1?k.toLowerCase():k;
+  /* tab B & C: pintasan huruf dimatikan agar tidak salah ketik; Enter = siswa berikutnya */
+  if(K.bag!=='A'){ if(k==='Enter'){ e.preventDefault(); sebelah(1); } return; }
   if(m[lk]){ e.preventDefault(); jawab(m[lk]); }
   else if(k===' '){ e.preventDefault(); var b=$('kkLewati'); if(b) b.click(); }
   else if(k==='Backspace'){ e.preventDefault(); mundur(); }
