@@ -5,8 +5,8 @@
    pilihan ganda (Q=A, W=B, E=C, R=D) atau tekan tombol besar A/B/C/D.
    Bagian B & C: hanya menampilkan kunci (dikoreksi manual).
    Bagian C: kunci + kriteria skor 0-4 per soal (dari prompt master).
-   Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}} }
-   (semua nilai berupa string agar aman digabung oleh mergeDeep_ saat sinkron)
+   Data: DB.koreksi = { kunci:{key:{n,a,b,c}}, jawab:{key:{siswaId:"ABCD-.."}}, waktu:{key:{siswaId:{d,t}}} }
+   (nilai berupa string/angka agar aman digabung oleh mergeDeep_ saat sinkron)
    Kunci lama di fitur Ujian (DB.kunciJawaban) TIDAK dipakai.
    ========================================================================= */
 (function(){
@@ -25,6 +25,7 @@ function ensure(){
   if(!DB.koreksi || typeof DB.koreksi!=='object') DB.koreksi = {};
   if(!DB.koreksi.kunci || typeof DB.koreksi.kunci!=='object') DB.koreksi.kunci = {};
   if(!DB.koreksi.jawab || typeof DB.koreksi.jawab!=='object') DB.koreksi.jawab = {};
+  if(!DB.koreksi.waktu || typeof DB.koreksi.waktu!=='object') DB.koreksi.waktu = {};
   return DB.koreksi;
 }
 function kelasObj(){ return DB.kelasList.find(function(k){return k.id===K.kelas;}); }
@@ -49,6 +50,29 @@ function getJawab(){
   var st=ensure().jawab, key=kJawab();
   if(!st[key]) st[key]={};
   return st[key];
+}
+/* ---------- Waktu koreksi Bagian A ----------
+   Mulai terhitung saat soal 1 diisi. Tiap jawaban menambah selisih waktu sejak jawaban
+   sebelumnya, dibatasi IDLE_MAX detik agar jeda panjang (istirahat) tidak ikut terhitung. */
+var IDLE_MAX = 120;
+function getWaktu(){
+  var st=ensure().waktu, key=kJawab();
+  if(!st[key]) st[key]={};
+  return st[key];
+}
+function catatWaktu(id, kosong){
+  var w=getWaktu(), now=Date.now(), r=w[id];
+  if(kosong || !r || !r.t){ w[id]={d:0,t:now}; return; }
+  r.d=Math.round((r.d+Math.min((now-r.t)/1000,IDLE_MAX))*10)/10; r.t=now;
+}
+function detikWaktu(id, selesai){
+  var r=getWaktu()[id]; if(!r||!r.t) return null;
+  return r.d + (selesai ? 0 : Math.min((Date.now()-r.t)/1000,IDLE_MAX));
+}
+function fmtWaktu(sec){
+  if(sec==null) return '–';
+  sec=Math.round(sec); var m=Math.floor(sec/60), d=sec%60;
+  return m+':'+(d<10?'0':'')+d;
 }
 function jawabSiswa(id,n){ return pad(getJawab()[id],n,'-'); }
 function simpan(){ try{ saveDB(); }catch(e){ console.warn(e); } }
@@ -280,7 +304,8 @@ function panelKoreksi(){
     strip+='<button class="'+cls+'" data-kk-pos="'+i+'" title="Soal '+(i+1)+'">'+(i+1)+(j!=='-'?j:'')+'</button>';
   }
   var h='<div class="card"><p class="kk-nama">'+esc(s.nama)+'</p>'+
-    '<div class="kk-info">Benar <span class="kk-skor">'+r.benar+' / '+kd.n+'</span> · Nilai A: <span class="kk-skor">'+nilaiA(r.benar,kd.n)+'</span> (maks '+maksBagian()+')</div>';
+    '<div class="kk-info">Benar <span class="kk-skor">'+r.benar+' / '+kd.n+'</span> · Nilai A: <span class="kk-skor">'+nilaiA(r.benar,kd.n)+'</span> (maks '+maksBagian()+')'+
+    ' · ⏱ <span class="kk-skor" id="kkTimer">'+(detikWaktu(s.id,r.terisi>=kd.n)==null?'mulai saat soal 1 diisi':fmtWaktu(detikWaktu(s.id,r.terisi>=kd.n)))+'</span></div>';
   if(selesai){
     h+='<div class="kk-no" style="font-size:34px;">Selesai ✓</div><div class="btn-row"><button class="btn" id="kkNext">Siswa berikutnya (Enter)</button><button class="btn secondary" id="kkUlang">Ulangi dari soal 1</button></div>';
   } else {
@@ -302,11 +327,14 @@ function referensiBC(){
 }
 function tabelHasil(){
   var kd=getKunci(false), el=$('kkHasil'); if(!el||!kd) return;
+  var total=0, jml=0;
   var rows=siswaList().map(function(s,i){
-    var r=hitung(kd,jawabSiswa(s.id,kd.n));
-    return '<tr><td>'+(i+1)+'</td><td>'+esc(s.nama)+'</td><td>'+(r.terisi?r.benar+' / '+kd.n:'–')+'</td><td>'+(r.terisi?nilaiA(r.benar,kd.n):'–')+'</td></tr>';
+    var r=hitung(kd,jawabSiswa(s.id,kd.n)), done=r.terisi>=kd.n, dt=detikWaktu(s.id,done);
+    if(done && dt!=null){ total+=dt; jml++; }
+    return '<tr><td>'+(i+1)+'</td><td>'+esc(s.nama)+'</td><td>'+(r.terisi?r.benar+' / '+kd.n:'–')+'</td><td>'+(r.terisi?nilaiA(r.benar,kd.n):'–')+'</td><td>'+(dt==null?'–':fmtWaktu(dt)+(done?'':' …'))+'</td></tr>';
   }).join('');
-  el.innerHTML='<div class="card kk-hasil"><h3 style="margin:0 0 6px;">Hasil Bagian A</h3><div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Benar</th><th>Nilai A</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+  var ringkas=jml?('<div class="kk-info">Waktu koreksi Bagian A: total <b>'+fmtWaktu(total)+'</b> untuk '+jml+' siswa · rata-rata <b>'+fmtWaktu(total/jml)+'</b> per siswa (jeda lebih dari '+IDLE_MAX+' dtk dihitung '+IDLE_MAX+' dtk).</div>'):'';
+  el.innerHTML='<div class="card kk-hasil"><h3 style="margin:0 0 6px;">Hasil Bagian A</h3><div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Benar</th><th>Nilai A</th><th>Waktu</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+ringkas+
     '<div class="btn-row" style="margin-top:10px;"><button class="btn" id="kkKirim">Terapkan Nilai A ke menu Nilai UTS/STS</button></div>'+
     '<div class="kk-info">Hanya siswa yang sudah ada jawabannya yang dikirim. Nilai B &amp; C tetap Anda isi sendiri di menu UTS/STS.</div></div>';
 }
@@ -323,6 +351,7 @@ function pilihSiswa(id){
 function jawab(huruf){
   var kd=getKunci(false), s=siswaAktif(); if(!kd||!s||K.pos>=kd.n) return;
   var jw=jawabSiswa(s.id,kd.n);
+  catatWaktu(s.id, jw.replace(/-/g,'')==='');
   getJawab()[s.id]=jw.slice(0,K.pos)+huruf+jw.slice(K.pos+1);
   K.pos++; simpan(); segarkan();
 }
@@ -404,7 +433,7 @@ sec.addEventListener('click',function(e){
   if(b.id==='kkSimpanBC'){
     var d2=getKunci(true); d2.b=($('kkB')||{}).value.trim(); d2.c=($('kkC')||{}).value.trim(); simpan(); render(); toast('Kunci B & C tersimpan.'); return;
   }
-  if(b.id==='kkLewati'){ var kd3=getKunci(false),s3=siswaAktif(); if(kd3&&s3&&K.pos<kd3.n){ var jw=jawabSiswa(s3.id,kd3.n); getJawab()[s3.id]=jw.slice(0,K.pos)+'-'+jw.slice(K.pos+1); K.pos++; simpan(); segarkan(); } return; }
+  if(b.id==='kkLewati'){ var kd3=getKunci(false),s3=siswaAktif(); if(kd3&&s3&&K.pos<kd3.n){ var jw=jawabSiswa(s3.id,kd3.n); if(getWaktu()[s3.id]) catatWaktu(s3.id,false); getJawab()[s3.id]=jw.slice(0,K.pos)+'-'+jw.slice(K.pos+1); K.pos++; simpan(); segarkan(); } return; }
   if(b.id==='kkMundur'){ mundur(); return; }
   if(b.id==='kkNext'){ berikutnya(); return; }
   if(b.id==='kkUlang'){ K.pos=0; segarkan(); return; }
@@ -427,6 +456,14 @@ document.addEventListener('keydown',function(e){
   else if(k==='ArrowRight'){ e.preventDefault(); if(K.pos<kd.n){ K.pos++; panelKoreksi(); } }
   else if(k==='Enter'){ e.preventDefault(); berikutnya(); }
 });
+
+/* ---------- Penghitung waktu berjalan ---------- */
+setInterval(function(){
+  var el=$('kkTimer'), kd=getKunci(false), s=siswaAktif();
+  if(!el||!kd||!s||!sec.classList.contains('active')) return;
+  var done=hitung(kd,jawabSiswa(s.id,kd.n)).terisi>=kd.n, dt=detikWaktu(s.id,done);
+  if(dt!=null) el.textContent=fmtWaktu(dt);
+},1000);
 
 /* ---------- Kaitkan ke navigasi ---------- */
 var asli=window.gotoPage;
